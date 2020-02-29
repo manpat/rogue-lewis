@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use rand::distributions::{Standard, Distribution};
+use std::fmt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Location(pub i32, pub i32);
@@ -37,6 +38,8 @@ pub enum Direction {
 }
 
 impl Direction {
+	pub fn iter_all() -> impl Iterator<Item=Direction> { (0..4).map(Into::into) }
+
 	pub fn opposite(self) -> Direction {
 		use Direction::*;
 		match self {
@@ -77,6 +80,20 @@ impl Distribution<Direction> for Standard {
 }
 
 
+impl fmt::Display for Direction {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			Direction::North => write!(f, "North"),
+			Direction::East  => write!(f, "East"),
+			Direction::South => write!(f, "South"),
+			Direction::West  => write!(f, "West"),
+		}
+	}
+}
+
+
+
+
 
 
 
@@ -90,8 +107,8 @@ pub struct Bounds {
 impl Bounds {
 	pub fn empty() -> Bounds {
 		Bounds {
-			min: Location(0, 0),
-			max: Location(-1, -1),
+			min: Location(std::i32::MAX, std::i32::MAX),
+			max: Location(std::i32::MIN, std::i32::MIN),
 		}
 	}
 
@@ -99,11 +116,23 @@ impl Bounds {
 		self.min.0 <= self.max.0 && self.min.1 <= self.max.1
 	}
 
+	pub fn contains(self, Location(x, y): Location) -> bool {
+		self.min.0 <= x && x <= self.max.0
+		&& self.min.1 <= y && y <= self.max.1
+	}
+
 	pub fn include(self, Location(x, y): Location) -> Bounds {
 		Bounds {
 			min: Location(self.min.0.min(x), self.min.1.min(y)),
 			max: Location(self.max.0.max(x), self.max.1.max(y)),
 		}
+	}
+
+	pub fn expand(self, x_amount: i32, y_amount: i32) -> Bounds {
+		Bounds {
+			min: Location(self.min.0 - x_amount, self.min.1 - y_amount),
+			max: Location(self.max.0 + x_amount, self.max.1 + y_amount),
+		}		
 	}
 
 	pub fn size(self) -> (i32, i32) {

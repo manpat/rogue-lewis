@@ -16,8 +16,7 @@ const EMPTY_CHAR: char = ' ';
 const PLAYER_CHAR: char = '⚲'; // '\u{26B2}';
 
 
-pub fn render(state: &GameState) -> RenderBuffer {
-	let bounds = state.map.bounds();
+pub fn render_map(state: &GameState, bounds: Bounds) -> RenderBuffer {
 	let (width, height) = bounds.size();
 
 	assert!(width > 0 && height > 0, "Map is empty!");
@@ -35,14 +34,14 @@ pub fn render(state: &GameState) -> RenderBuffer {
 
 	buffer.fill(EMPTY_CHAR);
 
-	for (location, room) in state.map.iter() {
+	for (location, room) in state.map.iter().filter(|&(l, _)| bounds.contains(l)) {
 		let room_dist = state.player_location.distance(location);
 		let obscured = room_dist > 2;
 
 		let buffer_location = room_to_buffer_space(location);
 		buffer.write(buffer_location, block_for_room(room, obscured));
 
-		for dir in room.neighbor_directions() {
+		for dir in room.iter_neighbor_directions() {
 			let corridor_loc = buffer_location.offset_in_direction(dir);
 			let target_room_loc = location.offset_in_direction(dir);
 			let connected = state.map.has(target_room_loc);

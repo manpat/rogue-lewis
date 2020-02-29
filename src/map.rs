@@ -37,4 +37,23 @@ impl Map {
 		self.rooms.iter_mut()
 			.map(|(loc, room)| (*loc, room))
 	}
+
+	pub fn iter_neighbors(&self, location: Location) -> impl Iterator<Item=(Direction, &Room)> {
+		Direction::iter_all()
+			.filter_map(move |dir| {
+				let room_loc = location.offset_in_direction(dir);
+				let room = self.rooms.get(&room_loc)?;
+				Some((dir, room))
+			})
+	}
+
+	// pub fn iter_neighbors_mut(&mut self, location: Location) -> impl Iterator<Item=(Direction, &mut Room)> {
+	// 	Direction::iter_all()
+	// 		.filter_map(move |dir| {
+	// 			let room_loc = location.offset_in_direction(dir);
+	// 			let room = self.rooms.get_mut(&room_loc)?;
+	// 			Some((dir, room))
+	// 		})
+	// }
+
 }

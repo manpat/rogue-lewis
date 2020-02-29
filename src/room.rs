@@ -12,7 +12,7 @@ impl Room {
 	pub fn door(&self, dir: Direction) -> bool { self.doors[dir as usize] }
 	pub fn set_door(&mut self, dir: Direction, open: bool) { self.doors[dir as usize] = open; }
 
-	pub fn neighbor_directions(&self) -> impl Iterator<Item=Direction> + '_ {
+	pub fn iter_neighbor_directions(&self) -> impl Iterator<Item=Direction> + '_ {
 		self.doors.iter().cloned()
 			.enumerate()
 			.filter(|&(_, door)| door)

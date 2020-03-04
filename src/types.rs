@@ -112,9 +112,9 @@ impl Bounds {
 		}
 	}
 
-	pub fn is_valid(&self) -> bool {
-		self.min.0 <= self.max.0 && self.min.1 <= self.max.1
-	}
+	// pub fn is_valid(&self) -> bool {
+	// 	self.min.0 <= self.max.0 && self.min.1 <= self.max.1
+	// }
 
 	pub fn contains(self, Location(x, y): Location) -> bool {
 		self.min.0 <= x && x <= self.max.0

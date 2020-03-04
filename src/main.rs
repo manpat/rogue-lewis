@@ -75,7 +75,7 @@ fn generate_game_state() -> game_state::GameState {
 		new_room.set_door(walk_dir.opposite(), true);
 	}
 
-	// Sanity check
+	// Fixup
 	let old_map = state.map.clone();
 	for (location, room) in old_map.iter() {
 		for dir in room.iter_neighbor_directions() {

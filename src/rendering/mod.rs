@@ -72,7 +72,7 @@ fn corridor_for_direction(dir: Direction, connected: bool, obscured: bool) -> ch
 	style[dir as usize]
 }
 
-fn block_for_room(room: &Room, obscured: bool) -> char {
+fn block_for_room(_room: &Room, obscured: bool) -> char {
 	// '█'
 	if obscured {
 		return '🝕';

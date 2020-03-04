@@ -6,6 +6,8 @@ use crate::room::Room;
 pub struct GameState {
 	pub map: Map,
 	pub player_location: Location,
+	// inventory
+	// stats/health
 }
 
 

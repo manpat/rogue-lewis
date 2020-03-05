@@ -1,58 +1,69 @@
+#![feature(box_syntax)]
+
 mod prelude;
 mod types;
 mod game_state;
 mod map;
 mod room;
 mod rendering;
+mod controller;
 
 use prelude::*;
+use controller::{Controller, Event};
 
 fn main() {
 	let mut state = generate_game_state();
+	let mut controller = box controller::MainController as Box<dyn Controller>;
+	controller.init(&state);
 
 	loop {
-		let bounds = state.map.iter()
-			.filter(|(loc, _)| loc.distance(state.player_location) < 2)
-			.fold(Bounds::empty(), |bounds, (loc, _)| bounds.include(loc))
-			.expand(1, 0);
-
-		println!("=============");
-		println!("{}", rendering::render_map(&state, bounds));
-		println!("=============");
-
-		let mut try_move = |dir| {
-			let room = state.map.get(state.player_location)
-				.expect("Player somehow not in a room");
-
-			if room.door(dir) {
-				state.player_location = state.player_location.offset_in_direction(dir);
-				state.generate_room_at(state.player_location);
-
-				println!("You move {}", dir);
-			} else {
-				println!("You can't go that way");
-			}
-		};
-
-		let mut command = read_line();
+		let mut command = read_command();
 		command.make_ascii_lowercase();
 
-		match command.as_str() {
-			"n" => try_move(Direction::North),
-			"e" => try_move(Direction::East),
-			"s" => try_move(Direction::South),
-			"w" => try_move(Direction::West),
-			"r" => { state = generate_game_state(); }
-			"m" => {
-				println!("==== map ====");
-				println!("{}", rendering::render_map(&state, state.map.bounds()));
-				println!("=============");
+		match controller.run_command(&mut state, &command) {
+			Event::Continue => {}
+			Event::Transition(new) => {
+				controller = new;
+				controller.init(&state);
 			}
 
-			"quit" | "q" => break,
-			_ => println!("what now?")
+			Event::Restart => {
+				println!("The walls warp and shift around you and your sense of reality temporarily disolves");
+				println!("You are unsure if any of the events you've experienced until now actually happened");
+				state = generate_game_state();
+				controller = box controller::MainController;
+				controller.init(&state);
+			}
+
+			Event::Win => {
+				println!("You win!");
+				break
+			}
+			Event::Lose => {
+				println!("You lost");
+				break
+			}
+			Event::Quit => {
+				println!("See ya!");
+				break
+			}
 		}
 	}
+}
+
+
+fn read_command() -> String {
+	use std::io::{Write, BufRead};
+
+	print!("> ");
+
+	std::io::stdout().flush()
+		.expect("Failed to flush");
+
+	std::io::stdin().lock()
+		.lines().next()
+		.expect("EOF")
+		.expect("Failed to read stdin")
 }
 
 

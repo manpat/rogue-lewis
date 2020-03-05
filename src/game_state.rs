@@ -42,4 +42,17 @@ impl GameState {
 
 		self.map.get_mut(location).unwrap()
 	}
+
+	pub fn try_move_player(&mut self, dir: Direction) -> bool {
+		let room = self.map.get(self.player_location)
+			.expect("Player somehow not in a room");
+
+		if room.door(dir) {
+			self.player_location = self.player_location.offset_in_direction(dir);
+			self.generate_room_at(self.player_location);
+			true
+		} else {
+			false
+		}
+	}
 }

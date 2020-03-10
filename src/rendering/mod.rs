@@ -3,7 +3,7 @@ pub use render_buffer::*;
 
 use crate::prelude::*;
 use crate::game_state::GameState;
-use crate::room::Room;
+use crate::room::{Room, EncounterType};
 
 
 // https://en.wikipedia.org/wiki/Box_Drawing_(Unicode_block)
@@ -35,7 +35,7 @@ pub fn render_map(state: &GameState, bounds: Bounds) -> RenderBuffer {
 	buffer.fill(EMPTY_CHAR);
 
 	for (location, room) in state.map.iter().filter(|&(l, _)| bounds.contains(l)) {
-		let room_dist = state.player_location.distance(location);
+		let room_dist = state.player.location.distance(location);
 		let obscured = room_dist > 2;
 
 		let buffer_location = room_to_buffer_space(location);
@@ -50,7 +50,7 @@ pub fn render_map(state: &GameState, bounds: Bounds) -> RenderBuffer {
 		}
 	}
 
-	buffer.write(room_to_buffer_space(state.player_location), PLAYER_CHAR);
+	buffer.write(room_to_buffer_space(state.player.location), PLAYER_CHAR);
 
 	buffer
 }
@@ -72,11 +72,33 @@ fn corridor_for_direction(dir: Direction, connected: bool, obscured: bool) -> ch
 	style[dir as usize]
 }
 
-fn block_for_room(_room: &Room, obscured: bool) -> char {
+fn block_for_room(room: &Room, obscured: bool) -> char {
+	if let Some(encounter) = room.encounter {
+		return block_for_encounter(encounter);
+	}
+
 	// '█'
 	if obscured {
 		return '🝕';
 	}
 
 	'■'
+}
+
+fn block_for_encounter(encounter: EncounterType) -> char {
+	match encounter {
+		EncounterType::Food 	=> '+',
+		EncounterType::Treasure => '+',
+		EncounterType::Key 		=> '+',
+		EncounterType::Equipment=> '+',
+		
+		EncounterType::Map 		=> '%',
+
+		EncounterType::Merchant => '$',
+		EncounterType::Chest 	=> 'C',
+		EncounterType::Trap 	=> 'X',
+
+		EncounterType::Monster 	=> 'M',
+		EncounterType::Boss 	=> 'B',
+	}
 }

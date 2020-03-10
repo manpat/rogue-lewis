@@ -1,4 +1,5 @@
 #![feature(box_syntax)]
+#![feature(vec_remove_item)]
 
 mod prelude;
 mod types;
@@ -20,14 +21,30 @@ fn main() {
 		let mut command = read_command();
 		command.make_ascii_lowercase();
 
+		if command.starts_with("dbg") {
+			match command.trim_start_matches("dbg").trim() {
+				"state" => println!("{:#?}", state),
+				"ply" => println!("{:#?}", state.player),
+				"inv" => println!("{:#?}", state.player.inventory),
+				"ctl" => println!("{:#?}", controller),
+				"key" => {
+					state.player.inventory.add(game_state::Item::Key)
+				}
+				_ => {}
+			}
+
+			continue
+		}
+
 		match controller.run_command(&mut state, &command) {
-			Event::Continue => {}
-			Event::Transition(new) => {
+			None => {}
+
+			Some(Event::Transition(new)) => {
 				controller = new;
 				controller.init(&state);
 			}
 
-			Event::Restart => {
+			Some(Event::Restart) => {
 				println!("The walls warp and shift around you and your sense of reality temporarily disolves");
 				println!("You are unsure if any of the events you've experienced until now actually happened");
 				state = generate_game_state();
@@ -35,15 +52,15 @@ fn main() {
 				controller.init(&state);
 			}
 
-			Event::Win => {
+			Some(Event::Win) => {
 				println!("You win!");
 				break
 			}
-			Event::Lose => {
+			Some(Event::Lose) => {
 				println!("You lost");
 				break
 			}
-			Event::Quit => {
+			Some(Event::Quit) => {
 				println!("See ya!");
 				break
 			}

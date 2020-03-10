@@ -8,13 +8,12 @@ pub use main::MainController;
 pub use battle::BattleController;
 pub use merchant::MerchantController;
 
-pub trait Controller {
+pub trait Controller: std::fmt::Debug {
 	fn init(&mut self, _state: &GameState) {}
-	fn run_command(&mut self, state: &mut GameState, command: &str) -> Event;
+	fn run_command(&mut self, state: &mut GameState, command: &str) -> Option<Event>;
 }
 
 pub enum Event {
-	Continue,
 	Transition(Box<dyn Controller>),
 	
 	Win,

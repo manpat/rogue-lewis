@@ -9,25 +9,26 @@ Rooms
 -----
 - Must have at least one door
 - Can contain one of the following:
-    - Chests
-    - Food
-    - Treasure
-    - Encounters w/ monsters
-    - Boss
-    - Traps
-    - Merchant
-    - Keys
-    - Maps
+    - Food                      ~33%
+    - Encounters w/ monsters    ~13%
+    - Treasure                  ~10%
+    - Traps                     ~5%
+    - Equipment                 ~4%
+    - Merchant                  ~3.3%
+    - Chests                    ~3%
+    - Keys                      ~2.6%
+    - Maps                      ~2%
+    - Boss                      ~1%
 - Can be an exit
     - Spawns a boss which must be beaten to escape
 
 Player
 ======
 - Has several stats
-    - Health
-    - Hunger
-    - Damage
-    - Shield
+    - Health    starts at 15
+    - Hunger    starts at 10
+    - Damage    starts at 2
+    - Shield    starts at 0
 - Has an inventory, which can contain several of any item *except* maps, which the player can only hold one of
 - Can equip equipment
 - Starts with 20 food and 5 treasure in inventory
@@ -100,7 +101,22 @@ Boss
 
 Trap
 ----
-- 
+- Is one of:
+    - Tripwire
+        - Player trips and drops [1, 2] items
+        - 1/3 chance to notice tripwire and avoid
+        - Player is given option to attemt to disarm - see Trap Disarm Loop
+    - Bolt
+        - Fires a bolt at player, dealing [1, 2] damage
+        - 1/3 chance to miss
+        - Player is given option to attemt to disarm - see Trap Disarm Loop
+    - Ambush
+        - A monster spawns and a battle is entered
+        - monster has 3/5 chance to deal it's damage before player has a chance to flee. This ignores any shield the player has
+        - 1/5 chance for player to get automatic free strike on monster
+            - BUG: monster immediately dies in this case
+        - After first strikes, this is a regular battle
+    - Portal
 
 
 Regular Game Loop
@@ -137,8 +153,8 @@ Battle Loop
     - damage stat for relevant party is temporarily doubled
 
 - When player chooses to fight
-    - player rolls D10
-    - enemy rolls D10 (if monster) or D13 (if boss)
+    - player rolls [1, 10]
+    - enemy rolls [1, 10]  (if monster) or [1, 13]  (if boss)
     - if rolls are equal nothing happens
     - if player rolls higher and player rolls:
         - a 1:              nothing happens

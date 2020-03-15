@@ -1,5 +1,6 @@
 #![feature(box_syntax)]
 #![feature(vec_remove_item)]
+#![deny(rust_2018_idioms, future_incompatible, elided_lifetimes_in_paths)]
 
 mod prelude;
 mod types;
@@ -24,7 +25,11 @@ fn main() {
 		if command.starts_with("dbg") {
 			match command.trim_start_matches("dbg").trim() {
 				"state" => println!("{:#?}", state),
-				"ply" => println!("{:#?}", state.player),
+				"ply" => {
+					println!("{:#?}", state.player);
+					println!("attack {:#?}", state.player.attack());
+					println!("defense {:#?}", state.player.defense());
+				}
 				"inv" => println!("{:#?}", state.player.inventory),
 				"ctl" => println!("{:#?}", controller),
 				"key" => {
@@ -87,31 +92,8 @@ fn read_command() -> String {
 fn generate_game_state() -> game_state::GameState {
 	let mut state = game_state::GameState::new();
 
-	let mut builder_loc = Location(0, 0);
-
-	for _ in 0..50 {
-		// Walk through a door if possible, otherwise just pick a direction and pretend there's a door there
-		let walk_dir = if let Some(room) = state.map.get(builder_loc) {
-			room.iter_neighbor_directions().choose(&mut rng())
-				.unwrap_or_else(|| random())
-		} else {
-			random()
-		};
-
-		builder_loc = builder_loc.offset_in_direction(walk_dir);
-		let new_room = state.generate_room_at(builder_loc);
-		new_room.set_door(walk_dir.opposite(), true);
-	}
-
-	// Fixup
-	let old_map = state.map.clone();
-	for (location, room) in old_map.iter() {
-		for dir in room.iter_neighbor_directions() {
-			if let Some(neighbor) = state.map.get_mut(location.offset_in_direction(dir)) {
-				neighbor.set_door(dir.opposite(), true);
-			}
-		}
-	}
+	let mut map_builder = map::MapBuilder::new(&mut state.map);
+	map_builder.generate_random_walk();
 
 	state
 }

@@ -39,7 +39,7 @@ pub fn render_map(state: &GameState, bounds: Bounds) -> RenderBuffer {
 		let obscured = room_dist > 2;
 
 		let buffer_location = room_to_buffer_space(location);
-		buffer.write(buffer_location, block_for_room(room, obscured));
+		buffer.write(buffer_location, block_for_room(&room, obscured));
 
 		for dir in room.iter_neighbor_directions() {
 			let corridor_loc = buffer_location.offset_in_direction(dir);

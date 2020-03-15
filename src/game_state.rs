@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::map::Map;
+use crate::map::{Map, MapBuilder};
 use crate::room::Room;
 
 #[derive(Debug)]
@@ -17,43 +17,22 @@ impl GameState {
 		}
 	}
 
-	pub fn generate_room_at(&mut self, location: Location) -> &mut Room {
-		if !self.map.has(location) {
-			let mut room = Room {
-				doors: random(),
-				encounter: random(),
-			};
-
-			for dir in room.iter_neighbor_directions() {
-				let target_loc = location.offset_in_direction(dir);
-
-				if let Some(target_room) = self.map.get_mut(target_loc) {
-					target_room.set_door(dir.opposite(), true);
-				}
-			}
-
-			for (dir, target_room) in self.map.iter_neighbors(location) {
-				if target_room.door(dir.opposite()) {
-					room.set_door(dir, true);
-				}
-			}
-
-			self.map.add(location, room);
-		}
-
-		self.map.get_mut(location).unwrap()
-	}
-
 	pub fn try_move_player(&mut self, dir: Direction) -> bool {
 		let room = self.map.get(self.player.location)
 			.expect("Player somehow not in a room");
 
 		if room.door(dir) {
 			self.player.location = self.player.location.offset_in_direction(dir);
-			self.generate_room_at(self.player.location);
+			MapBuilder::new(&mut self.map).generate_room_at(self.player.location);
 			true
 		} else {
 			false
+		}
+	}
+
+	pub fn remove_encounter_at(&mut self, loc: Location) {
+		if let Some(room) = self.map.get(loc) {
+			self.map.replace(loc, Room { encounter: None, .. room });
 		}
 	}
 }
@@ -85,7 +64,7 @@ impl Player {
 	}
 
 	pub fn attack(&self) -> i32 { 2 }
-	pub fn defence(&self) -> i32 { 0 }
+	pub fn defense(&self) -> i32 { 0 }
 }
 
 

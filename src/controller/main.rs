@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::controller::*;
-use crate::game_state::GameState;
+use crate::game_state::{GameState, Item};
 use crate::room::EncounterType;
 
 #[derive(Debug)]
@@ -39,77 +39,84 @@ impl Controller for MainController {
 }
 
 fn try_move(state: &mut GameState, dir: Direction) -> Option<Event> {
-	if state.try_move_player(dir) {
-		println!("You move {}", dir);
+	if !state.try_move_player(dir) {
+		println!("You can't go that way");
+		return None
+	}
 
-		let player_pos = state.player.location;
-		let current_room = state.map.get_mut(player_pos).unwrap();
+	println!("You move {}", dir);
 
-		if current_room.encounter.is_some() {
-			if let Some(event) = run_encounter(&mut state.player, current_room) {
-				return Some(event);
-			}
+	if !state.player.inventory.take(Item::Food) {
+		state.player.hunger -= 1;
+		if state.player.hunger <= 0 {
+			println!("You starve to death");
+			return Some(Event::Lose)
+		} else {
+			println!("You have run out of food! You can travel {} rooms", state.player.hunger);
+		}
+	} else {
+		state.player.hunger = 10;
+	}
+
+	let player_pos = state.player.location;
+	let current_room = state.map.get(player_pos).unwrap();
+
+	if let Some(encounter_ty) = current_room.encounter {
+		let encounter_event = run_encounter(state, encounter_ty);
+
+		if !encounter_ty.is_persistent() {
+			state.remove_encounter_at(player_pos);
 		}
 
-		print_local_area(state);
-
-	} else {
-		println!("You can't go that way");
+		if encounter_event.is_some() {
+			return encounter_event;
+		}
 	}
+
+	print_local_area(state);
 
 	None
 }
 
-fn run_encounter(player: &mut crate::game_state::Player, room: &mut crate::room::Room) -> Option<Event> {
-	use crate::game_state::Item;
+fn run_encounter(state: &mut GameState, encounter_ty: EncounterType) -> Option<Event> {
+	println!("]]] running encounter {:?}", encounter_ty);
 
-	let encounter = if let Some(e) = room.encounter { e } else { return None };
+	let inv = &mut state.player.inventory;
 
-	println!("]]] running encounter {:?}", encounter);
-
-	match encounter {
+	match encounter_ty {
 		EncounterType::Food => {
-			player.inventory.add(Item::Food);
-			room.encounter = None;
-
+			inv.add(Item::Food);
 			println!("You found food");
 		}
 
 		EncounterType::Treasure => {
-			player.inventory.add(Item::Treasure);
-			room.encounter = None;
-
+			inv.add(Item::Treasure);
 			println!("You found treasure");
 		}
 
 		EncounterType::Key => {
-			player.inventory.add(Item::Key);
-			room.encounter = None;
-
+			inv.add(Item::Key);
 			println!("You found a key!");
 		}
 
 		EncounterType::Map => {
-			if !player.inventory.has(Item::Map) {
-				player.inventory.add(Item::Map);
-				room.encounter = None;
-
+			if !inv.has(Item::Map) {
 				println!("You found a map!");
 			} else {
-				println!("You found a map, but you already have one so you leave it");
+				println!("You found another map. It may have some value");
 			}
+
+			inv.add(Item::Map);
 		}
 
 		EncounterType::Chest => {
-			if player.inventory.take(Item::Key) {
-				room.encounter = None;
-
+			if inv.take(Item::Key) {
 				let item = Item::Food; // TODO
 
 				println!("You found a chest!");
 				println!("You open it with one of your keys to receive {:?}", item);
 
-				player.inventory.add(item);
+				inv.add(item);
 			} else {
 				println!("You found a chest, but don't have a key to open it");
 			}

@@ -35,7 +35,7 @@ impl RenderBuffer {
 }
 
 impl fmt::Display for RenderBuffer {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let get_ch = |x, y| {
 			let index = x + y * self.width;
 			let ch = self.buffer[index];

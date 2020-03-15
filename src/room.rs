@@ -1,24 +1,28 @@
 use crate::prelude::*;
 use rand::distributions::{Standard, Distribution};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Room {
 	pub doors: [bool; 4],
 	pub encounter: Option<EncounterType>,
+	pub is_exit: bool,
 }
 
 impl Room {
-	pub fn with_doors(doors: [bool; 4]) -> Room { Room { doors, encounter: None } }
-	pub fn new() -> Room { Room::with_doors([false; 4]) }
+	pub fn new() -> Room {
+		Room {
+			doors: [false; 4],
+			encounter: None,
+			is_exit: false,
+		}
+	}
 
 	pub fn door(&self, dir: Direction) -> bool { self.doors[dir as usize] }
 	pub fn set_door(&mut self, dir: Direction, open: bool) { self.doors[dir as usize] = open; }
 
 	pub fn iter_neighbor_directions(&self) -> impl Iterator<Item=Direction> + '_ {
-		self.doors.iter().cloned()
-			.enumerate()
-			.filter(|&(_, door)| door)
-			.map(|(idx, _)| idx.into())
+		Direction::iter_all()
+			.filter(move |&dir| self.door(dir))
 	}
 }
 
@@ -54,6 +58,20 @@ impl EncounterType {
 			EncounterType::Boss 	=> 1.0,
 		}
 	}
+
+	/// Determines whether this encounter hangs around after the player
+	/// enters the room or if it's consumed immediately
+	pub fn is_persistent(&self) -> bool {
+		match self {
+			EncounterType::Merchant
+			| EncounterType::Chest
+			| EncounterType::Trap
+			| EncounterType::Monster
+			| EncounterType::Boss => true,
+
+			_ => false
+		}
+	}
 }
 
 impl Distribution<EncounterType> for Standard {
@@ -74,3 +92,4 @@ impl Distribution<EncounterType> for Standard {
 		*choices.choose_weighted(rng, EncounterType::probability).unwrap()
 	}
 }
+

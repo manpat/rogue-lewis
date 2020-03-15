@@ -74,8 +74,7 @@ Equipment
 
 Map
 ---
-- Added immediately to inventory *if* player doesn't already have one
-- If player already has a map, the map remains in the room so it can be collected later
+- Added immediately to inventory
 - Allows player to see the entirety of initially generated map with "map" command
     - Until this point the player can only see parts of the map they've visited
 

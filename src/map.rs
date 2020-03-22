@@ -100,7 +100,7 @@ impl<'m> MapBuilder<'m> {
 	fn generate_room() -> Room {
 		Room {
 			doors: random(),
-			encounter: if rng().gen_bool(0.2) {
+			encounter: if rng().gen_bool(0.8) {
 				Some(random())
 			} else {
 				None

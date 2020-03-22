@@ -2,7 +2,7 @@ pub mod render_buffer;
 pub use render_buffer::*;
 
 use crate::prelude::*;
-use crate::game_state::GameState;
+use crate::game_state::{GameState, Item};
 use crate::room::{Room, EncounterType};
 
 
@@ -32,14 +32,18 @@ pub fn render_map(state: &GameState, bounds: Bounds) -> RenderBuffer {
 		loc.relative_to(bounds.min).scale(x_scale, y_scale).offset(2, 2)
 	};
 
+	let player_has_map = state.player.inventory.has(Item::Map);
+
 	buffer.fill(EMPTY_CHAR);
 
 	for (location, room) in state.map.iter().filter(|&(l, _)| bounds.contains(l)) {
 		let room_dist = state.player.location.distance(location);
 		let obscured = room_dist > 2;
 
+		let room_visited = player_has_map || state.map.visited(location);
+
 		let buffer_location = room_to_buffer_space(location);
-		buffer.write(buffer_location, block_for_room(&room, obscured));
+		buffer.write(buffer_location, block_for_room(&room, obscured, room_visited));
 
 		for dir in room.iter_neighbor_directions() {
 			let corridor_loc = buffer_location.offset_in_direction(dir);
@@ -72,12 +76,19 @@ fn corridor_for_direction(dir: Direction, connected: bool, obscured: bool) -> ch
 	style[dir as usize]
 }
 
-fn block_for_room(room: &Room, obscured: bool) -> char {
+fn block_for_room(room: &Room, obscured: bool, visited: bool) -> char {
+	if !visited {
+		return '□';
+	}
+
+	if room.is_exit {
+		return if obscured {'◬'} else {'▲'};
+	}
+
 	if let Some(encounter) = room.encounter {
 		return block_for_encounter(encounter);
 	}
 
-	// '█'
 	if obscured {
 		return '🝕';
 	}

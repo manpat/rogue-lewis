@@ -60,6 +60,8 @@ fn try_move(state: &mut GameState, dir: Direction) -> Option<Event> {
 
 	let player_pos = state.player.location;
 	let current_room = state.map.get(player_pos).unwrap();
+	
+	state.map.mark_visited(player_pos);
 
 	if let Some(encounter_ty) = current_room.encounter {
 		let encounter_event = run_encounter(state, encounter_ty);
@@ -110,13 +112,20 @@ fn run_encounter(state: &mut GameState, encounter_ty: EncounterType) -> Option<E
 		}
 
 		EncounterType::Chest => {
+			let chest_items = [Item::Food, Item::Treasure, Item::Key];
+
 			if inv.take(Item::Key) {
-				let item = Item::Food; // TODO
+				let num_items = rng().gen_range(1, 5);
+				let items = chest_items.choose_multiple(&mut rng(), num_items);
 
 				println!("You found a chest!");
-				println!("You open it with one of your keys to receive {:?}", item);
+				println!("You open it with one of your keys");
 
-				inv.add(item);
+				for item in items {
+					println!("You found a {:?}", item);
+					inv.add(*item);
+				}
+
 			} else {
 				println!("You found a chest, but don't have a key to open it");
 			}

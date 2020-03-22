@@ -1,3 +1,4 @@
+#![feature(nll)]
 #![feature(box_syntax)]
 #![feature(vec_remove_item)]
 #![deny(rust_2018_idioms, future_incompatible, elided_lifetimes_in_paths)]
@@ -21,27 +22,62 @@ fn main() {
 	loop {
 		let mut command = read_command();
 		command.make_ascii_lowercase();
+		let command = command.split_whitespace().collect::<Vec<_>>();
 
-		if command.starts_with("dbg") {
-			match command.trim_start_matches("dbg").trim() {
-				"state" => println!("{:#?}", state),
-				"ply" => {
+		if command.is_empty() {
+			continue;
+		}
+
+		if command[0] == "d" {
+			use game_state::Item;
+			use room::{Room, EncounterType};
+
+			let ply_loc = state.player.location;
+			let room = state.map.get(ply_loc).unwrap();
+
+			match command[1..] {
+				["state"] => println!("{:#?}", state),
+				["ply"] => {
 					println!("{:#?}", state.player);
 					println!("attack {:#?}", state.player.attack());
 					println!("defense {:#?}", state.player.defense());
 				}
-				"inv" => println!("{:#?}", state.player.inventory),
-				"ctl" => println!("{:#?}", controller),
-				"key" => {
-					state.player.inventory.add(game_state::Item::Key)
+				["inv"] => println!("{:#?}", state.player.inventory),
+				["ctl"] => println!("{:#?}", controller),
+
+				["g", "key"] => state.player.inventory.add(Item::Key),
+				["g", "key", n] => state.player.inventory.add_n(Item::Key, n.parse().unwrap()),
+				["g", "food"] => state.player.inventory.add(Item::Food),
+				["g", "food", n] => state.player.inventory.add_n(Item::Food, n.parse().unwrap()),
+				["g", "map"] => state.player.inventory.add(Item::Map),
+				["g", "treasure"] => state.player.inventory.add(Item::Treasure),
+				["g", "treasure", n] => state.player.inventory.add_n(Item::Treasure, n.parse().unwrap()),
+
+				["g", "health", n] => { state.player.health += n.parse::<i32>().unwrap() }
+
+				["p", "chest"] => {
+					state.map.replace(ply_loc, Room {
+						encounter: Some(EncounterType::Chest),
+						.. room
+					})
 				}
-				_ => {}
+
+				["p", "exit"] => {
+					state.map.replace(ply_loc, Room {
+						is_exit: true,
+						.. room
+					})
+				}
+
+				_ => {
+					println!("Nani!?");
+				}
 			}
 
 			continue
 		}
 
-		match controller.run_command(&mut state, &command) {
+		match controller.run_command(&mut state, command[0]) {
 			None => {}
 
 			Some(Event::Transition(new)) => {

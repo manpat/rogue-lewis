@@ -1,16 +1,18 @@
 use crate::prelude::*;
 use crate::room::Room;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct Map {
 	rooms: HashMap<Location, Room>,
+	visited: HashSet<Location>,
 }
 
 impl Map {
 	pub fn new() -> Map {
 		Map {
-			rooms: [(Location(0, 0), Room::new())].iter().cloned().collect()
+			rooms: [(Location(0, 0), Room::new())].iter().cloned().collect(),
+			visited: [Location(0, 0)].iter().cloned().collect(),
 		}
 	}
 
@@ -26,6 +28,9 @@ impl Map {
 
 	pub fn has(&self, loc: Location) -> bool { self.rooms.contains_key(&loc) }
 	pub fn get(&self, loc: Location) -> Option<Room> { self.rooms.get(&loc).cloned() }
+
+	pub fn visited(&self, loc: Location) -> bool { self.visited.contains(&loc) }
+	pub fn mark_visited(&mut self, loc: Location) -> bool { self.visited.insert(loc) }
 
 	pub fn bounds(&self) -> Bounds {
 		self.rooms.keys()

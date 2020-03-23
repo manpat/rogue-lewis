@@ -9,7 +9,7 @@ pub struct MerchantController {
 }
 
 impl Controller for MerchantController {
-	fn init(&mut self, _: &GameState) {
+	fn enter(&mut self, _: &mut GameState) {
 		println!("The merchant greets you");
 	}
 
@@ -17,7 +17,7 @@ impl Controller for MerchantController {
 		match command {
 			_ => {
 				println!("The merchant is insulted by whatever it is you just said and forces you to leave");
-				Some(Event::Transition(box MainController))
+				Some(Event::Leave)
 			}
 		}
 

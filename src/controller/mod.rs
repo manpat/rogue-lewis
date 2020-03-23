@@ -9,12 +9,15 @@ pub use battle::BattleController;
 pub use merchant::MerchantController;
 
 pub trait Controller: std::fmt::Debug {
-	fn init(&mut self, _state: &GameState) {}
+	fn enter(&mut self, _state: &mut GameState) {}
+	fn leave(&mut self, _state: &mut GameState) {}
 	fn run_command(&mut self, state: &mut GameState, command: &str) -> Option<Event>;
 }
 
 pub enum Event {
-	Transition(Box<dyn Controller>),
+	TransitionTo(Box<dyn Controller>),
+	Enter(Box<dyn Controller>),
+	Leave,
 	
 	Win,
 	Lose,

@@ -7,7 +7,7 @@ use crate::room::EncounterType;
 pub struct MainController;
 
 impl Controller for MainController {
-	fn init(&mut self, state: &GameState) {
+	fn enter(&mut self, state: &mut GameState) {
 		println!("Which way do you go?");
 		print_local_area(state);
 	}
@@ -22,8 +22,12 @@ impl Controller for MainController {
 
 			"h" | "help" => { print_help(); None },
 
-			"testbattle" => Some(Event::Transition(box BattleController { boss: random() })),
-			"testmerchant" => Some(Event::Transition(box MerchantController {})),
+			"testbattle" => {
+				let loc = state.player.location;
+				state.spawn_enemy_at(loc, random());
+				Some(Event::Enter(box BattleController::new(loc)))
+			},
+			"testmerchant" => Some(Event::Enter(box MerchantController {})),
 
 			"iwin" => Some(Event::Win),
 			"ilose" => Some(Event::Lose),
@@ -60,7 +64,7 @@ fn try_move(state: &mut GameState, dir: Direction) -> Option<Event> {
 
 	let player_pos = state.player.location;
 	let current_room = state.map.get(player_pos).unwrap();
-	
+
 	state.map.mark_visited(player_pos);
 
 	if let Some(encounter_ty) = current_room.encounter {
@@ -84,6 +88,7 @@ fn run_encounter(state: &mut GameState, encounter_ty: EncounterType) -> Option<E
 	println!("]]] running encounter {:?}", encounter_ty);
 
 	let inv = &mut state.player.inventory;
+	let player_loc = state.player.location;
 
 	match encounter_ty {
 		EncounterType::Food => {
@@ -132,15 +137,23 @@ fn run_encounter(state: &mut GameState, encounter_ty: EncounterType) -> Option<E
 		}
 
 		EncounterType::Monster => {
-			return Some(Event::Transition(box BattleController { boss: false }))
+			if state.get_enemy(player_loc).is_none() {
+				state.spawn_enemy_at(player_loc, false);
+			}
+
+			return Some(Event::Enter(box BattleController::new(player_loc)))
 		}
 
 		EncounterType::Boss => {
-			return Some(Event::Transition(box BattleController { boss: true }))
+			if state.get_enemy(player_loc).is_none() {
+				state.spawn_enemy_at(player_loc, true);
+			}
+
+			return Some(Event::Enter(box BattleController::new(player_loc)))
 		}
 
 		EncounterType::Merchant => {
-			return Some(Event::Transition(box MerchantController {}))
+			return Some(Event::Enter(box MerchantController {}))
 		}		
 
 		_ => {}

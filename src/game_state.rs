@@ -1,11 +1,16 @@
 use crate::prelude::*;
 use crate::map::{Map, MapBuilder};
 use crate::room::Room;
+use crate::enemy::*;
+
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct GameState {
 	pub map: Map,
 	pub player: Player,
+
+	pub enemies: HashMap<Location, Enemy>,
 }
 
 
@@ -14,6 +19,8 @@ impl GameState {
 		GameState {
 			map: Map::new(),
 			player: Player::new(),
+
+			enemies: HashMap::new(),
 		}
 	}
 
@@ -34,6 +41,21 @@ impl GameState {
 		if let Some(room) = self.map.get(loc) {
 			self.map.replace(loc, Room { encounter: None, .. room });
 		}
+
+		self.enemies.remove(&loc);
+	}
+
+	pub fn spawn_enemy_at(&mut self, loc: Location, boss: bool) {
+		let archetype = EnemyArchetype::choose(boss);
+		self.enemies.insert(loc, archetype.new());
+	}
+
+	pub fn get_enemy(&self, loc: Location) -> Option<Enemy> {
+		self.enemies.get(&loc).copied()
+	}
+
+	pub fn update_enemy(&mut self, loc: Location, enemy: Enemy) {
+		self.enemies.insert(loc, enemy);
 	}
 }
 

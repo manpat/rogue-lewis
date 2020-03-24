@@ -70,3 +70,8 @@ impl EnemyArchetype {
 		Enemy { archetype: self, health: self.health() }
 	}
 }
+
+
+impl Enemy {
+	pub fn is_dead(&self) -> bool { self.health <= 0 }
+}

@@ -87,6 +87,8 @@ impl Player {
 
 	pub fn attack(&self) -> i32 { 2 }
 	pub fn defense(&self) -> i32 { 0 }
+
+	pub fn is_dead(&self) -> bool { self.health <= 0 }
 }
 
 

@@ -48,6 +48,9 @@ fn main() {
 				["inv"] => println!("{:#?}", state.player.inventory),
 				["ctl"] => println!("{:#?}", controllers),
 
+				["room"] => println!("{:#?}", state.map.get(state.player.location)),
+				["enemy"] => println!("{:#?}", state.get_enemy(state.player.location)),
+
 				["g", "key"] => state.player.inventory.add(Item::Key),
 				["g", "key", n] => state.player.inventory.add_n(Item::Key, n.parse().unwrap()),
 				["g", "food"] => state.player.inventory.add(Item::Food),
@@ -92,6 +95,8 @@ fn main() {
 			}
 
 			Some(Event::Enter(mut new)) => {
+				controllers.last_mut().unwrap().leave(&mut state);
+
 				new.enter(&mut state);
 				controllers.push(new);
 			}
@@ -100,6 +105,8 @@ fn main() {
 				if let Some(mut prev) = controllers.pop() {
 					prev.leave(&mut state);
 				}
+
+				controllers.last_mut().unwrap().enter(&mut state);
 			}
 
 			Some(Event::Restart) => {

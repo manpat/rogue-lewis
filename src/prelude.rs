@@ -4,3 +4,14 @@ pub use rand::{Rng, random, seq::SliceRandom, seq::IteratorRandom};
 // pub type Result<T> = std::result::Result<T, failure::Error>;
 
 pub fn rng() -> rand::rngs::ThreadRng { rand::thread_rng() }
+
+
+pub fn choose_with_weights<T: Copy>(values: &[T], weights: &[i32]) -> T {
+	use rand::distributions::weighted::WeightedIndex;
+	use rand::distributions::Distribution;
+
+	assert!(values.len() == weights.len());
+
+	let dist = WeightedIndex::new(weights).unwrap();
+	values[dist.sample(&mut rng())]
+}

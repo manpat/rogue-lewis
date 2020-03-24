@@ -22,6 +22,8 @@ impl Controller for MainController {
 
 			"h" | "help" => { print_help(); None },
 
+			// TODO: eat | heal
+
 			"testbattle" => {
 				let loc = state.player.location;
 				state.spawn_enemy_at(loc, random());

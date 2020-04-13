@@ -6,30 +6,30 @@ use crate::room::EncounterType;
 #[derive(Debug)]
 pub struct MainController;
 
-impl Controller for MainController {
-	fn enter(&mut self, state: &mut GameState) {
+impl ControllerTrait for MainController {
+	fn enter(&mut self, ctx: &mut ControllerContext<'_>) {
 		println!("Which way do you go?");
-		print_local_area(state);
+		print_local_area(ctx.state);
 	}
 
-	fn run_command(&mut self, state: &mut GameState, command: &str) -> Option<Event> {
+	fn run_command(&mut self, ctx: &mut ControllerContext<'_>, command: &str) -> Option<Event> {
 		match command {
-			"n" | "north" => try_move(state, Direction::North),
-			"e" | "east" => try_move(state, Direction::East),
-			"s" | "south" => try_move(state, Direction::South),
-			"w" | "west" => try_move(state, Direction::West),
-			"m" | "map" => { print_map(state); None },
+			"n" | "north" => try_move(ctx, Direction::North),
+			"e" | "east" => try_move(ctx, Direction::East),
+			"s" | "south" => try_move(ctx, Direction::South),
+			"w" | "west" => try_move(ctx, Direction::West),
+			"m" | "map" => { print_map(ctx.state); None },
 
 			"h" | "help" => { print_help(); None },
 
 			// TODO: eat | heal
 
 			"testbattle" => {
-				let loc = state.player.location;
-				state.spawn_enemy_at(loc, random());
-				Some(Event::Enter(box BattleController::new(loc)))
+				let loc = ctx.state.player.location;
+				ctx.state.spawn_enemy_at(loc, random());
+				Some(Event::Enter(BattleController::new(loc).into()))
 			},
-			"testmerchant" => Some(Event::Enter(box MerchantController {})),
+			"testmerchant" => Some(Event::Enter(MerchantController{}.into())),
 
 			"iwin" => Some(Event::Win),
 			"ilose" => Some(Event::Lose),
@@ -44,36 +44,41 @@ impl Controller for MainController {
 	}
 }
 
-fn try_move(state: &mut GameState, dir: Direction) -> Option<Event> {
-	if !state.try_move_player(dir) {
+fn try_move(ctx: &mut ControllerContext<'_>, dir: Direction) -> Option<Event> {
+	if !ctx.state.try_move_player(dir) {
 		println!("You can't go that way");
 		return None
 	}
 
 	println!("You move {}", dir);
 
-	if !state.player.inventory.take(Item::Food) {
-		state.player.hunger -= 1;
-		if state.player.hunger <= 0 {
+	if !ctx.state.player.inventory.take(Item::Food) {
+		ctx.state.player.hunger -= 1;
+		if ctx.state.player.hunger <= 0 {
 			println!("You starve to death");
 			return Some(Event::Lose)
 		} else {
-			println!("You have run out of food! You can travel {} rooms", state.player.hunger);
+			println!("You have run out of food! You can travel {} rooms", ctx.state.player.hunger);
 		}
 	} else {
-		state.player.hunger = 10;
+		ctx.state.player.hunger = 10;
 	}
 
-	let player_pos = state.player.location;
-	let current_room = state.map.get(player_pos).unwrap();
+	let player_pos = ctx.state.player.location;
+	let current_room = ctx.state.map.get(player_pos).unwrap();
 
-	state.map.mark_visited(player_pos);
+	ctx.state.map.mark_visited(player_pos);
+
+	if current_room.is_exit {
+		println!("You found the exit!");
+		return Some(Event::Win);
+	}
 
 	if let Some(encounter_ty) = current_room.encounter {
-		let encounter_event = run_encounter(state, encounter_ty);
+		let encounter_event = run_encounter(ctx, encounter_ty);
 
 		if !encounter_ty.is_persistent() {
-			state.remove_encounter_at(player_pos);
+			ctx.state.remove_encounter_at(player_pos);
 		}
 
 		if encounter_event.is_some() {
@@ -81,16 +86,16 @@ fn try_move(state: &mut GameState, dir: Direction) -> Option<Event> {
 		}
 	}
 
-	print_local_area(state);
+	print_local_area(ctx.state);
 
 	None
 }
 
-fn run_encounter(state: &mut GameState, encounter_ty: EncounterType) -> Option<Event> {
+fn run_encounter(ctx: &mut ControllerContext<'_>, encounter_ty: EncounterType) -> Option<Event> {
 	println!("]]] running encounter {:?}", encounter_ty);
 
-	let inv = &mut state.player.inventory;
-	let player_loc = state.player.location;
+	let inv = &mut ctx.state.player.inventory;
+	let player_loc = ctx.state.player.location;
 
 	match encounter_ty {
 		EncounterType::Food => {
@@ -139,23 +144,23 @@ fn run_encounter(state: &mut GameState, encounter_ty: EncounterType) -> Option<E
 		}
 
 		EncounterType::Monster => {
-			if state.get_enemy(player_loc).is_none() {
-				state.spawn_enemy_at(player_loc, false);
+			if ctx.state.get_enemy(player_loc).is_none() {
+				ctx.state.spawn_enemy_at(player_loc, false);
 			}
 
-			return Some(Event::Enter(box BattleController::new(player_loc)))
+			return Some(Event::Enter(BattleController::new(player_loc).into()))
 		}
 
 		EncounterType::Boss => {
-			if state.get_enemy(player_loc).is_none() {
-				state.spawn_enemy_at(player_loc, true);
+			if ctx.state.get_enemy(player_loc).is_none() {
+				ctx.state.spawn_enemy_at(player_loc, true);
 			}
 
-			return Some(Event::Enter(box BattleController::new(player_loc)))
+			return Some(Event::Enter(BattleController::new(player_loc).into()))
 		}
 
 		EncounterType::Merchant => {
-			return Some(Event::Enter(box MerchantController {}))
+			return Some(Event::Enter(MerchantController {}.into()))
 		}		
 
 		_ => {}

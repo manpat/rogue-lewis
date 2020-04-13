@@ -13,14 +13,14 @@ mod controller;
 mod enemy;
 
 use prelude::*;
-use controller::{Controller, Event};
+use controller::{MainController, Controller, ControllerContext, Event};
 
 fn main() {
 	let mut state = generate_game_state();
-	let mut main_controller = box controller::MainController;
-	main_controller.enter(&mut state);
+	let mut main_controller = Controller::from(MainController);
+	main_controller.enter(&mut ControllerContext::new(&mut state));
 
-	let mut controllers: Vec<Box<dyn Controller>> = vec![main_controller];
+	let mut controllers: Vec<Controller> = vec![main_controller];
 
 	loop {
 		let mut command = read_command();
@@ -83,38 +83,40 @@ fn main() {
 			continue
 		}
 
-		match controllers.last_mut().unwrap().run_command(&mut state, command[0]) {
+		let ctl_ctx = &mut ControllerContext::new(&mut state);
+
+		match controllers.last_mut().unwrap().run_command(ctl_ctx, command[0]) {
 			None => {}
 
 			Some(Event::TransitionTo(mut new)) => {
 				if let Some(mut prev) = controllers.pop() {
-					prev.leave(&mut state);
+					prev.leave(ctl_ctx);
 				}
-				new.enter(&mut state);
+				new.enter(ctl_ctx);
 				controllers.push(new);
 			}
 
 			Some(Event::Enter(mut new)) => {
-				controllers.last_mut().unwrap().leave(&mut state);
+				controllers.last_mut().unwrap().leave(ctl_ctx);
 
-				new.enter(&mut state);
+				new.enter(ctl_ctx);
 				controllers.push(new);
 			}
 
 			Some(Event::Leave) => {
 				if let Some(mut prev) = controllers.pop() {
-					prev.leave(&mut state);
+					prev.leave(ctl_ctx);
 				}
 
-				controllers.last_mut().unwrap().enter(&mut state);
+				controllers.last_mut().unwrap().enter(ctl_ctx);
 			}
 
 			Some(Event::Restart) => {
 				println!("The walls warp and shift around you and your sense of reality temporarily disolves");
 				println!("You are unsure if any of the events you've experienced until now actually happened");
-				state = generate_game_state();
-				let mut main_controller = box controller::MainController;
-				main_controller.enter(&mut state);
+				*ctl_ctx.state = generate_game_state();
+				let mut main_controller = Controller::from(MainController);
+				main_controller.enter(ctl_ctx);
 				controllers = vec![main_controller];
 			}
 

@@ -239,15 +239,14 @@ pub async fn run_battle_controller(ctx: Coordinator, loc: Location) {
 	println!("[battle] enter");
 
 	let mut ctl = BattleController::new(loc);
-	let mut state = ctx.hack_game_mut();
-	let ctl_ctx = &mut ControllerContext::new(&mut state);
 
-	ctl.enter(ctl_ctx);
+	ctl.enter(&mut ControllerContext::new(&mut ctx.hack_game_mut()));
 
 	loop {
 		let command = ctx.get_player_command().await;
 
-		match ctl.run_command(ctl_ctx, &command) {
+		let mut game = ctx.hack_game_mut();
+		match ctl.run_command(&mut ControllerContext::new(&mut game), &command) {
 			Some(Event::Leave) => break,
 			Some(Event::Lose) => {
 				println!("[battle] big ol lose there buddy");
@@ -257,7 +256,7 @@ pub async fn run_battle_controller(ctx: Coordinator, loc: Location) {
 		}
 	}
 
-	ctl.leave(ctl_ctx);
+	ctl.leave(&mut ControllerContext::new(&mut ctx.hack_game_mut()));
 
 	println!("[battle] leave");
 }
@@ -268,7 +267,6 @@ pub async fn run_battle_controller(ctx: Coordinator, loc: Location) {
 
 enum Event {
 	Leave,
-	
 	Lose,
 }
 

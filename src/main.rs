@@ -24,10 +24,11 @@ fn main() {
 	let game_state = Rc::new(RefCell::new(game_state));
 	let coordinator = task::Coordinator::new(Rc::clone(&game_state));
 
-	executor.queue(controller::run_main_controller(coordinator));
+	executor.queue(controller::run_main_controller(coordinator.clone()));
 
 	while executor.num_queued_tasks() > 0 {
 		executor.poll();
+		coordinator.run(&mut game_state.borrow_mut());
 
 		// 	Some(Event::Restart) => {
 		// 		println!("The walls warp and shift around you and your sense of reality temporarily disolves");

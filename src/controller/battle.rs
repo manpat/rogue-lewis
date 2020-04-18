@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::controller::*;
 use crate::game_state::*;
 use crate::enemy::*;
+use crate::task;
 
 #[derive(Debug)]
 pub struct BattleController {
@@ -15,7 +16,7 @@ pub enum BattleEvent {
 }
 
 impl ControllerTrait for BattleController {
-	fn enter(&mut self, ctx: &mut ControllerContext<'_>) {
+	fn enter(&mut self, ctx: &mut ControllerContext) {
 		let enemy = ctx.state.get_enemy(self.location)
 			.expect("Tried to start battle with no enemy");
 
@@ -32,7 +33,7 @@ impl ControllerTrait for BattleController {
 		println!("Do you fight or run like a coward?");
 	}
 
-	fn leave(&mut self, ctx: &mut ControllerContext<'_>) {
+	fn leave(&mut self, ctx: &mut ControllerContext) {
 		if let Some(enemy) = self.enemy {
 			if enemy.health > 0 {
 				ctx.state.update_enemy(self.location, enemy);
@@ -44,7 +45,7 @@ impl ControllerTrait for BattleController {
 		}
 	}
 
-	fn run_command(&mut self, ctx: &mut ControllerContext<'_>, command: &str) -> Option<Event> {
+	fn run_command(&mut self, ctx: &mut ControllerContext, command: &str) -> Option<Event> {
 		match command {
 			"f" | "fight" => self.run_player_attack(ctx),
 
@@ -93,7 +94,7 @@ impl BattleController {
 	fn enemy_archetype(&self) -> EnemyArchetype { self.enemy.unwrap().archetype }
 	fn is_enemy_boss(&self) -> bool { self.enemy_archetype().is_boss() }
 
-	fn run_player_attack(&mut self, ctx: &mut ControllerContext<'_>) -> Option<Event> {
+	fn run_player_attack(&mut self, ctx: &mut ControllerContext) -> Option<Event> {
 		use std::cmp::Ordering;
 		use AttackSeverity::*;
 
@@ -141,7 +142,7 @@ impl BattleController {
 
 	}
 
-	fn run_enemy_attack_during_heal(&self, ctx: &mut ControllerContext<'_>) -> Option<Event> {
+	fn run_enemy_attack_during_heal(&self, ctx: &mut ControllerContext) -> Option<Event> {
 		use AttackSeverity::*;
 
 		let probabilities = if self.is_enemy_boss() {[2, 2, 6]} else {[3, 4, 6]};
@@ -150,7 +151,7 @@ impl BattleController {
 		self.apply_enemy_attack(ctx, severity, false)
 	}
 
-	fn run_enemy_attack_during_flee(&self, ctx: &mut ControllerContext<'_>) -> Option<Event> {
+	fn run_enemy_attack_during_flee(&self, ctx: &mut ControllerContext) -> Option<Event> {
 		if rng().gen_ratio(2, 5) {
 			self.apply_enemy_attack(ctx, AttackSeverity::Hit, true)
 		} else {
@@ -159,7 +160,7 @@ impl BattleController {
 	}
 
 
-	fn apply_player_attack(&mut self, ctx: &mut ControllerContext<'_>, severity: AttackSeverity) -> Option<Event> {
+	fn apply_player_attack(&mut self, ctx: &mut ControllerContext, severity: AttackSeverity) -> Option<Event> {
 		let enemy_archetype = self.enemy_archetype();
 		let player = &ctx.state.player;
 		let mut damage = player.attack();
@@ -200,7 +201,7 @@ impl BattleController {
 	}
 
 
-	fn apply_enemy_attack(&self, ctx: &mut ControllerContext<'_>, severity: AttackSeverity, ignore_shield: bool) -> Option<Event> {
+	fn apply_enemy_attack(&self, ctx: &mut ControllerContext, severity: AttackSeverity, ignore_shield: bool) -> Option<Event> {
 		let enemy_archetype = self.enemy_archetype();
 		let player = &mut ctx.state.player;
 		let mut damage = enemy_archetype.attack();
@@ -238,4 +239,34 @@ impl BattleController {
 			None
 		}
 	}
+}
+
+
+pub async fn run_battle_controller(ctx: GameStateHandle, loc: Location) {
+	println!("[battle] enter");
+
+	let mut ctl = BattleController::new(loc);
+	let mut state = ctx.borrow_mut();
+	let mut ctl_ctx = &mut ControllerContext::new(&mut state);
+
+	ctl.enter(ctl_ctx);
+
+	loop {
+		let command = task::get_player_command().await;
+
+		match ctl.run_command(ctl_ctx, &command) {
+			Some(Event::Leave) => break,
+			Some(Event::Lose) => {
+				println!("[battle] big ol lose there buddy");
+				return
+			}
+			None => {}
+
+			_ => todo!()
+		}
+	}
+
+	ctl.leave(ctl_ctx);
+
+	println!("[battle] leave");
 }

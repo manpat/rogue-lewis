@@ -15,3 +15,9 @@ pub fn choose_with_weights<T: Copy>(values: &[T], weights: &[i32]) -> T {
 	let dist = WeightedIndex::new(weights).unwrap();
 	values[dist.sample(&mut rng())]
 }
+
+
+
+pub use std::rc::Rc;
+pub use std::cell::RefCell;
+pub type GameStateHandle = Rc<RefCell<crate::game_state::GameState>>;

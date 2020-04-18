@@ -2,33 +2,33 @@ use crate::prelude::*;
 use crate::controller::*;
 use crate::game_state::{GameState, Item};
 use crate::room::EncounterType;
-use crate::task;
+use crate::task::Coordinator;
 
 
-async fn try_move(game_state: GameStateHandle, dir: Direction) -> bool {
-	if !game_state.borrow_mut().try_move_player(dir) {
+async fn try_move(ctx: Coordinator, dir: Direction) -> bool {
+	if !ctx.hack_game_mut().try_move_player(dir) {
 		println!("You can't go that way");
 		return false
 	}
 
 	println!("You move {}", dir);
 
-	if !game_state.borrow_mut().player.inventory.take(Item::Food) {
-		game_state.borrow_mut().player.hunger -= 1;
-		if game_state.borrow_mut().player.hunger <= 0 {
+	if !ctx.hack_game_mut().player.inventory.take(Item::Food) {
+		ctx.hack_game_mut().player.hunger -= 1;
+		if ctx.hack_game_mut().player.hunger <= 0 {
 			println!("You starve to death");
 			return true
 		} else {
-			println!("You have run out of food! You can travel {} rooms", game_state.borrow_mut().player.hunger);
+			println!("You have run out of food! You can travel {} rooms", ctx.hack_game_mut().player.hunger);
 		}
 	} else {
-		game_state.borrow_mut().player.hunger = 10;
+		ctx.hack_game_mut().player.hunger = 10;
 	}
 
-	let player_pos = game_state.borrow_mut().player.location;
-	let current_room = game_state.borrow_mut().map.get(player_pos).unwrap();
+	let player_pos = ctx.hack_game_mut().player.location;
+	let current_room = ctx.hack_game_mut().map.get(player_pos).unwrap();
 
-	game_state.borrow_mut().map.mark_visited(player_pos);
+	ctx.hack_game_mut().map.mark_visited(player_pos);
 
 	if current_room.is_exit {
 		println!("You found the exit!");
@@ -36,53 +36,53 @@ async fn try_move(game_state: GameStateHandle, dir: Direction) -> bool {
 	}
 
 	if let Some(encounter_ty) = current_room.encounter {
-		run_encounter(Rc::clone(&game_state), encounter_ty).await;
+		run_encounter(ctx.clone(), encounter_ty).await;
 
 		if !encounter_ty.is_persistent() {
-			game_state.borrow_mut().remove_encounter_at(player_pos);
+			ctx.hack_game_mut().remove_encounter_at(player_pos);
 		}
 	}
 
-	print_local_area(&game_state.borrow());
+	print_local_area(&ctx.hack_game());
 
 	false
 }
 
-async fn run_encounter(game_state: GameStateHandle, encounter_ty: EncounterType) {
+async fn run_encounter(ctx: Coordinator, encounter_ty: EncounterType) {
 	println!("]]] running encounter {:?}", encounter_ty);
 
-	let player_loc = game_state.borrow().player.location;
+	let player_loc = ctx.hack_game().player.location;
 
 	match encounter_ty {
 		EncounterType::Food => {
-			game_state.borrow_mut().player.inventory.add(Item::Food);
+			ctx.hack_game_mut().player.inventory.add(Item::Food);
 			println!("You found food");
 		}
 
 		EncounterType::Treasure => {
-			game_state.borrow_mut().player.inventory.add(Item::Treasure);
+			ctx.hack_game_mut().player.inventory.add(Item::Treasure);
 			println!("You found treasure");
 		}
 
 		EncounterType::Key => {
-			game_state.borrow_mut().player.inventory.add(Item::Key);
+			ctx.hack_game_mut().player.inventory.add(Item::Key);
 			println!("You found a key!");
 		}
 
 		EncounterType::Map => {
-			if !game_state.borrow_mut().player.inventory.has(Item::Map) {
+			if !ctx.hack_game_mut().player.inventory.has(Item::Map) {
 				println!("You found a map!");
 			} else {
 				println!("You found another map. It may have some value");
 			}
 
-			game_state.borrow_mut().player.inventory.add(Item::Map);
+			ctx.hack_game_mut().player.inventory.add(Item::Map);
 		}
 
 		EncounterType::Chest => {
 			let chest_items = [Item::Food, Item::Treasure, Item::Key];
 
-			if game_state.borrow_mut().player.inventory.take(Item::Key) {
+			if ctx.hack_game_mut().player.inventory.take(Item::Key) {
 				let num_items = rng().gen_range(1, 5);
 				let items = chest_items.choose_multiple(&mut rng(), num_items);
 
@@ -91,7 +91,7 @@ async fn run_encounter(game_state: GameStateHandle, encounter_ty: EncounterType)
 
 				for item in items {
 					println!("You found a {:?}", item);
-					game_state.borrow_mut().player.inventory.add(*item);
+					ctx.hack_game_mut().player.inventory.add(*item);
 				}
 
 			} else {
@@ -100,23 +100,23 @@ async fn run_encounter(game_state: GameStateHandle, encounter_ty: EncounterType)
 		}
 
 		EncounterType::Monster => {
-			if game_state.borrow_mut().get_enemy(player_loc).is_none() {
-				game_state.borrow_mut().spawn_enemy_at(player_loc, false);
+			if ctx.hack_game_mut().get_enemy(player_loc).is_none() {
+				ctx.hack_game_mut().spawn_enemy_at(player_loc, false);
 			}
 
-			run_battle_controller(game_state, player_loc).await;
+			run_battle_controller(ctx, player_loc).await;
 		}
 
 		EncounterType::Boss => {
-			if game_state.borrow_mut().get_enemy(player_loc).is_none() {
-				game_state.borrow_mut().spawn_enemy_at(player_loc, true);
+			if ctx.hack_game_mut().get_enemy(player_loc).is_none() {
+				ctx.hack_game_mut().spawn_enemy_at(player_loc, true);
 			}
 
-			run_battle_controller(game_state, player_loc).await;
+			run_battle_controller(ctx, player_loc).await;
 		}
 
 		EncounterType::Merchant => {
-			run_merchant_controller().await;
+			run_merchant_controller(ctx).await;
 		}		
 
 		_ => {}
@@ -146,19 +146,19 @@ fn print_help() {
 
 
 
-pub async fn run_main_controller(ctx: GameStateHandle) {
+pub async fn run_main_controller(ctx: Coordinator) {
 	println!("[main] enter");
 
 	'main_loop: loop {
 		println!("Which way do you go?");
-		print_local_area(&ctx.borrow());
+		print_local_area(&ctx.hack_game());
 
 		loop {
-			let command = task::get_player_command().await;
+			let command = ctx.get_player_command().await;
 			let command: Vec<&str> = command.split_whitespace().collect();
 
 			if command[0] == "d" {
-				let mut state = ctx.borrow_mut();
+				let mut state = ctx.hack_game_mut();
 				use crate::room::Room;
 
 				let ply_loc = state.player.location;
@@ -209,24 +209,23 @@ pub async fn run_main_controller(ctx: GameStateHandle) {
 			}
 
 			match command[0] {
-				"n" | "north" => if try_move(Rc::clone(&ctx), Direction::North).await { break 'main_loop }
-				"e" | "east" => if try_move(Rc::clone(&ctx), Direction::East).await { break 'main_loop }
-				"s" | "south" => if try_move(Rc::clone(&ctx), Direction::South).await { break 'main_loop }
-				"w" | "west" => if try_move(Rc::clone(&ctx), Direction::West).await { break 'main_loop }
-				"m" | "map" => print_map(&ctx.borrow()),
+				"n" | "north" => if try_move(ctx.clone(), Direction::North).await { break 'main_loop }
+				"e" | "east" => if try_move(ctx.clone(), Direction::East).await { break 'main_loop }
+				"s" | "south" => if try_move(ctx.clone(), Direction::South).await { break 'main_loop }
+				"w" | "west" => if try_move(ctx.clone(), Direction::West).await { break 'main_loop }
+				"m" | "map" => print_map(&ctx.hack_game()),
 
 				"h" | "help" => print_help(),
 
 				// TODO: eat | heal
 
 				"testbattle" => {
-					let loc = ctx.borrow_mut().player.location;
-					ctx.borrow_mut().spawn_enemy_at(loc, random());
-					drop(ctx.borrow_mut());
+					let loc = ctx.hack_game_mut().player.location;
+					ctx.hack_game_mut().spawn_enemy_at(loc, random());
 
-					run_battle_controller(Rc::clone(&ctx), loc).await
+					run_battle_controller(ctx.clone(), loc).await
 				},
-				"testmerchant" => run_merchant_controller().await,
+				"testmerchant" => run_merchant_controller(ctx.clone()).await,
 
 				// "iwin" => Some(Event::Win),
 				// "ilose" => Some(Event::Lose),

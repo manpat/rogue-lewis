@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::controller::*;
 use crate::game_state::*;
 use crate::enemy::*;
-use crate::task;
+use crate::task::Coordinator;
 
 #[derive(Debug)]
 pub struct BattleController {
@@ -10,12 +10,20 @@ pub struct BattleController {
 	enemy: Option<Enemy>,
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum BattleEvent {
 
+#[derive(Debug, Copy, Clone)]
+enum AttackSeverity {
+	Crit,
+	Hit,
+	Miss,
 }
 
-impl ControllerTrait for BattleController {
+
+impl BattleController {
+	pub fn new(location: Location) -> BattleController {
+		BattleController { location, enemy: None }
+	}
+
 	fn enter(&mut self, ctx: &mut ControllerContext) {
 		let enemy = ctx.state.get_enemy(self.location)
 			.expect("Tried to start battle with no enemy");
@@ -74,21 +82,6 @@ impl ControllerTrait for BattleController {
 				None
 			}
 		}
-	}
-}
-
-
-#[derive(Debug, Copy, Clone)]
-enum AttackSeverity {
-	Crit,
-	Hit,
-	Miss,
-}
-
-
-impl BattleController {
-	pub fn new(location: Location) -> BattleController {
-		BattleController { location, enemy: None }
 	}
 
 	fn enemy_archetype(&self) -> EnemyArchetype { self.enemy.unwrap().archetype }
@@ -242,17 +235,17 @@ impl BattleController {
 }
 
 
-pub async fn run_battle_controller(ctx: GameStateHandle, loc: Location) {
+pub async fn run_battle_controller(ctx: Coordinator, loc: Location) {
 	println!("[battle] enter");
 
 	let mut ctl = BattleController::new(loc);
-	let mut state = ctx.borrow_mut();
-	let mut ctl_ctx = &mut ControllerContext::new(&mut state);
+	let mut state = ctx.hack_game_mut();
+	let ctl_ctx = &mut ControllerContext::new(&mut state);
 
 	ctl.enter(ctl_ctx);
 
 	loop {
-		let command = task::get_player_command().await;
+		let command = ctx.get_player_command().await;
 
 		match ctl.run_command(ctl_ctx, &command) {
 			Some(Event::Leave) => break,
@@ -261,8 +254,6 @@ pub async fn run_battle_controller(ctx: GameStateHandle, loc: Location) {
 				return
 			}
 			None => {}
-
-			_ => todo!()
 		}
 	}
 
@@ -270,3 +261,24 @@ pub async fn run_battle_controller(ctx: GameStateHandle, loc: Location) {
 
 	println!("[battle] leave");
 }
+
+
+
+
+
+enum Event {
+	Leave,
+	
+	Lose,
+}
+
+struct ControllerContext<'gs> {
+	pub state: &'gs mut GameState,
+}
+
+impl<'gs> ControllerContext<'gs> {
+	fn new(state: &'gs mut GameState) -> Self {
+		ControllerContext { state }
+	}
+}
+

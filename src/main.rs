@@ -10,7 +10,7 @@ mod types;
 mod game_state;
 mod map;
 mod room;
-mod rendering;
+mod view;
 mod controller;
 mod enemy;
 
@@ -22,13 +22,20 @@ fn main() {
 
 	let game_state = generate_game_state();
 	let game_state = Rc::new(RefCell::new(game_state));
-	let coordinator = task::Coordinator::new(Rc::clone(&game_state));
+	let mut coordinator = task::Coordinator::new(Rc::clone(&game_state));
 
-	executor.queue(controller::run_main_controller(coordinator.clone()));
+	unsafe {
+		COORDINATOR = Some(RefCell::new(coordinator.clone()));
+	}
+
+	let mut view = view::View::new(coordinator.clone());
+
+	executor.queue(controller::run_main_controller());
 
 	while executor.num_queued_tasks() > 0 {
 		executor.poll();
-		coordinator.run(&mut game_state.borrow_mut());
+		coordinator.run(&mut game_state.borrow_mut(), &mut view);
+		view.render(&game_state.borrow());
 
 		// 	Some(Event::Restart) => {
 		// 		println!("The walls warp and shift around you and your sense of reality temporarily disolves");
@@ -38,6 +45,16 @@ fn main() {
 		// 		main_controller.enter(ctl_ctx);
 		// 		controllers = vec![main_controller];
 		// 	}
+	}
+}
+
+static mut COORDINATOR: Option<RefCell<task::Coordinator>> = None;
+
+pub fn get_coordinator() -> std::cell::Ref<'static, task::Coordinator> {
+	unsafe {
+		COORDINATOR.as_ref()
+			.expect("Coordinator not initialised!")
+			.borrow()
 	}
 }
 

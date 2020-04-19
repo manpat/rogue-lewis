@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::controller::*;
 use crate::game_state::*;
 use crate::enemy::*;
-use crate::task::Coordinator;
+use crate::task;
 
 #[derive(Debug)]
 pub struct BattleController {
@@ -235,15 +235,16 @@ impl BattleController {
 }
 
 
-pub async fn run_battle_controller(ctx: Coordinator, loc: Location) {
+pub async fn run_battle_controller(loc: Location) {
 	println!("[battle] enter");
 
+	let ctx = get_coordinator().clone();
 	let mut ctl = BattleController::new(loc);
 
 	ctl.enter(&mut ControllerContext::new(&mut ctx.hack_game_mut()));
 
 	loop {
-		let command = ctx.get_player_command().await;
+		let command = task::get_player_command().await;
 
 		let mut game = ctx.hack_game_mut();
 		match ctl.run_command(&mut ControllerContext::new(&mut game), &command) {

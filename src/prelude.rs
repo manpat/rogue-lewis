@@ -21,5 +21,7 @@ pub fn choose_with_weights<T: Copy>(values: &[T], weights: &[i32]) -> T {
 }
 
 
+pub use crate::get_coordinator;
+
 
 pub type GameStateHandle = Rc<RefCell<crate::game_state::GameState>>;

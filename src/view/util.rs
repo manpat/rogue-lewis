@@ -1,5 +1,4 @@
-pub mod render_buffer;
-pub use render_buffer::*;
+use crate::view::render_buffer::*;
 
 use crate::prelude::*;
 use crate::game_state::{GameState, Item};

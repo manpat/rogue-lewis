@@ -132,11 +132,11 @@ fn print_help() {
 pub async fn run_main_controller() {
 	println!("[main] enter");
 
+	// TODO: this doesn't make sense for a retained mode view
+	task::show_map(false).await;
+
 	'main_loop: loop {
 		println!("Which way do you go?");
-
-		// TODO: this doesn't make sense for a retained mode view
-		task::show_map(false).await;
 
 		loop {
 			let command = task::get_player_command().await;
@@ -212,9 +212,6 @@ pub async fn run_main_controller() {
 					run_battle_controller(loc).await
 				},
 				"testmerchant" => run_merchant_controller().await,
-
-				// "iwin" => Some(Event::Win),
-				// "ilose" => Some(Event::Lose),
 
 				// "r" | "restart" => Some(Event::Restart),
 				"q" | "quit" => break 'main_loop,

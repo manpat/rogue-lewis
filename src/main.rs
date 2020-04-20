@@ -36,15 +36,6 @@ fn main() {
 		executor.poll();
 		coordinator.run(&mut game_state.borrow_mut(), &mut view);
 		view.render(&game_state.borrow());
-
-		// 	Some(Event::Restart) => {
-		// 		println!("The walls warp and shift around you and your sense of reality temporarily disolves");
-		// 		println!("You are unsure if any of the events you've experienced until now actually happened");
-		// 		*ctl_ctx.state = generate_game_state();
-		// 		let mut main_controller = Controller::from(MainController);
-		// 		main_controller.enter(ctl_ctx);
-		// 		controllers = vec![main_controller];
-		// 	}
 	}
 }
 

@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::map::{Map, MapBuilder};
 use crate::room::Room;
 use crate::enemy::*;
+use crate::task::ControllerEvent;
 
 use std::collections::HashMap;
 
@@ -56,6 +57,18 @@ impl GameState {
 
 	pub fn update_enemy(&mut self, loc: Location, enemy: Enemy) {
 		self.enemies.insert(loc, enemy);
+	}
+
+	pub fn notify_event(&mut self, event: ControllerEvent) {
+		match event {
+			ControllerEvent::PlayerGotItem(item) => {
+				self.player.inventory.add(item);
+			}
+
+			// ControllerEvent::PlayerConsumeItem(item) => {
+			// 	self.player.inventory.take(item);
+			// }
+		}
 	}
 }
 

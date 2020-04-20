@@ -52,7 +52,6 @@ impl Executor {
 
 			match task.future.as_mut().poll(&mut task::Context::from_waker(&waker)) {
 				Poll::Ready(_) => {
-					println!("Task {:?} Done!", task.task_id);
 					task.task_id = INVALID_TASK_ID;
 				}
 

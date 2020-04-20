@@ -54,30 +54,10 @@ async fn run_encounter(encounter_ty: EncounterType) {
 	let player_loc = get_coordinator().hack_game().player.location;
 
 	match encounter_ty {
-		EncounterType::Food => {
-			get_coordinator().hack_game_mut().player.inventory.add(Item::Food);
-			println!("You found food");
-		}
-
-		EncounterType::Treasure => {
-			get_coordinator().hack_game_mut().player.inventory.add(Item::Treasure);
-			println!("You found treasure");
-		}
-
-		EncounterType::Key => {
-			get_coordinator().hack_game_mut().player.inventory.add(Item::Key);
-			println!("You found a key!");
-		}
-
-		EncounterType::Map => {
-			if !get_coordinator().hack_game_mut().player.inventory.has(Item::Map) {
-				println!("You found a map!");
-			} else {
-				println!("You found another map. It may have some value");
-			}
-
-			get_coordinator().hack_game_mut().player.inventory.add(Item::Map);
-		}
+		EncounterType::Food => task::give_player_item(Item::Food).await,
+		EncounterType::Treasure => task::give_player_item(Item::Treasure).await,
+		EncounterType::Key => task::give_player_item(Item::Key).await,
+		EncounterType::Map => task::give_player_item(Item::Map).await,
 
 		EncounterType::Chest => {
 			let chest_items = [Item::Food, Item::Treasure, Item::Key];
@@ -90,8 +70,9 @@ async fn run_encounter(encounter_ty: EncounterType) {
 				println!("You open it with one of your keys");
 
 				for item in items {
-					println!("You found a {:?}", item);
-					get_coordinator().hack_game_mut().player.inventory.add(*item);
+					task::give_player_item(*item).await;
+					// println!("You found a {:?}", item);
+					// get_coordinator().hack_game_mut().player.inventory.add(*item);
 				}
 
 			} else {
@@ -140,7 +121,7 @@ pub async fn run_main_controller() {
 
 		loop {
 			let command = task::get_player_command().await;
-			let command: Vec<&str> = command.split_whitespace().collect();
+			let command: Vec<&str> = command.0.split_whitespace().collect();
 
 			if command[0] == "d" {
 				let coordinator = get_coordinator().clone();
@@ -186,6 +167,21 @@ pub async fn run_main_controller() {
 						})
 					}
 
+					["battle"] => {
+						drop(state);
+
+						let loc = get_coordinator().hack_game_mut().player.location;
+						get_coordinator().hack_game_mut().spawn_enemy_at(loc, random());
+
+						run_battle_controller(loc).await
+					}
+
+					["merchant"] => {
+						drop(state);
+
+						run_merchant_controller().await
+					}
+
 					_ => {
 						println!("Nani!?");
 					}
@@ -204,14 +200,6 @@ pub async fn run_main_controller() {
 				"h" | "help" => print_help(),
 
 				// TODO: eat | heal
-
-				"testbattle" => {
-					let loc = get_coordinator().hack_game_mut().player.location;
-					get_coordinator().hack_game_mut().spawn_enemy_at(loc, random());
-
-					run_battle_controller(loc).await
-				},
-				"testmerchant" => run_merchant_controller().await,
 
 				// "r" | "restart" => Some(Event::Restart),
 				"q" | "quit" => break 'main_loop,

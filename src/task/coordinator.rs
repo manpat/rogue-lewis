@@ -1,79 +1,94 @@
 use crate::prelude::*;
 use crate::game_state::GameState;
-use crate::view::View;
+use crate::view::{View, ViewEvent, ViewEventType};
+use crate::task::{PlayerCommand, ControllerEvent};
 
 use std::task::Waker;
-
-pub(super) struct Inner {
-	pub scheduled_awaits: Vec<(WakeEvent, Waker)>,
-	pub player_command: Option<String>,
-
-	on_player_command: Option<Waker>,
-	on_map_shown: Option<Waker>,
-}
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug)]
 pub(super) enum WakeEvent {
 	GetPlayerCommand,
 	ShowMap { whole_map: bool },
+	ControllerEvent(ControllerEvent),
+}
+
+pub(super) struct Inner {
+	pub scheduled_awaits: Vec<(WakeEvent, Waker)>,
+	pub player_command: Option<PlayerCommand>,
+
+	pub scheduled_view_wakeups: HashMap<ViewEventType, Waker>,
 }
 
 #[derive(Clone)]
 pub struct Coordinator {
 	inner: Rc<RefCell<Inner>>,
-	game_state: GameStateHandle,
+	hack_game_state: GameStateHandle,
 }
 
 impl Coordinator {
-	pub fn new(game_state: GameStateHandle) -> Coordinator {
+	pub fn new(hack_game_state: GameStateHandle) -> Coordinator {
 		let inner = Inner {
 			scheduled_awaits: Vec::new(),
 			player_command: None,
 
-			on_player_command: None,
-			on_map_shown: None,
+			scheduled_view_wakeups: HashMap::new(),
 		};
 
 		Coordinator {
 			inner: Rc::new(RefCell::new(inner)),
-			game_state
+			hack_game_state
 		}
 	}
 
-	pub fn hack_game(&self) -> std::cell::Ref<GameState> { self.game_state.borrow() }
-	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.game_state.borrow_mut() }
+	pub fn hack_game(&self) -> std::cell::Ref<GameState> { self.hack_game_state.borrow() }
+	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.hack_game_state.borrow_mut() }
 
-	pub fn run(&mut self, _game_state: &mut GameState, view: &mut View) {
+	pub fn run(&mut self, game_state: &mut GameState, view: &mut View) {
 		let scheduled_awaits = std::mem::replace(&mut self.inner.borrow_mut().scheduled_awaits, Vec::new());
 
 		for (event, waker) in scheduled_awaits {
 			match event {
 				WakeEvent::GetPlayerCommand => {
-					self.inner.borrow_mut().on_player_command = Some(waker);
+					self.inner.borrow_mut().scheduled_view_wakeups.insert(ViewEventType::PlayerCommand, waker);
 					view.request_player_command();
 				}
 
 				WakeEvent::ShowMap { whole_map } => {
-					// TODO: maybe the view should just emit an event instead of taking the waker directly?
-					self.inner.borrow_mut().on_map_shown = Some(waker);
+					self.inner.borrow_mut().scheduled_view_wakeups.insert(ViewEventType::MapShown, waker);
 					view.request_show_map(whole_map);
+				}
+
+				WakeEvent::ControllerEvent(event) => {
+					game_state.notify_event(event);
+					view.notify_controller_event(event);
+
+					// TODO: waker should be woken after view is done processing it
+					waker.wake();
 				}
 			}
 		}
 	}
 
-	pub fn notify_map_shown(&self) {
-		if let Some(waker) = self.inner.borrow_mut().on_map_shown.take() {
+	pub fn notify_view_event(&self, event: ViewEvent) {
+		let mut inner = self.inner.borrow_mut();
+		let event_ty = event.to_type();
+
+		match event {
+			ViewEvent::PlayerCommand(cmd) => {
+				inner.player_command = Some(cmd);
+			}
+
+			_ => {}
+		}
+
+		if let Some(waker) = inner.scheduled_view_wakeups.remove(&event_ty) {
 			waker.wake();
 		}
 	}
 
-	pub fn notify_player_command(&self, cmd: String) {
-		self.inner.borrow_mut().player_command = Some(cmd);
-
-		if let Some(waker) = self.inner.borrow_mut().on_player_command.take() {
-			waker.wake();
-		}
+	pub(super) fn notify_controller_event(&self, event: ControllerEvent) -> impl Future<Output=()> {
+		self.schedule_event_await(WakeEvent::ControllerEvent(event))
 	}
 
 	pub(super) fn schedule_value_await<F, O>(&self, event: WakeEvent, try_get_result: F) -> impl Future<Output=O>

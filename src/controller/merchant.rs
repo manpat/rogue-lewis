@@ -10,7 +10,7 @@ pub async fn run_merchant_controller() {
 	match task::get_player_command().await {
 		cmd => {
 			println!("The merchant is insulted by whatever it is you just said and forces you to leave");
-			println!("player input {}", cmd);
+			println!("player input {:?}", cmd);
 		}
 	}
 

@@ -199,9 +199,8 @@ pub async fn run_battle_controller(loc: Location) {
 
 	loop {
 		let command = task::get_player_command().await;
-		let mut game = ctx.hack_game_mut();
 
-		match command.as_str() {
+		match command.0.as_str() {
 			"f" | "fight" => match ctl.run_player_attack() {
 				Some(Event::Lose) => {
 					println!("lose??");
@@ -214,9 +213,9 @@ pub async fn run_battle_controller(loc: Location) {
 			}
 
 			"e" | "eat" | "h" | "heal" => {
-				if game.player.inventory.take(Item::Food) {
+				if ctx.hack_game_mut().player.inventory.take(Item::Food) {
 					let health_gain: i32 = rng().gen_range(1, 4);
-					game.player.health += health_gain;
+					ctx.hack_game_mut().player.health += health_gain;
 					println!("You recover {} health", health_gain);
 
 					if let Some(Event::Lose) = ctl.run_enemy_attack_during_heal() {

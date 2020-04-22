@@ -213,7 +213,7 @@ pub async fn run_battle_controller(loc: Location) {
 			}
 
 			"e" | "eat" | "h" | "heal" => {
-				if ctx.hack_game_mut().player.inventory.take(Item::Food) {
+				if task::consume_player_item(Item::Food).await {
 					let health_gain: i32 = rng().gen_range(1, 4);
 					ctx.hack_game_mut().player.health += health_gain;
 					println!("You recover {} health", health_gain);

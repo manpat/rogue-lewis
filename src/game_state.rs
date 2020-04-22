@@ -2,7 +2,7 @@ use crate::prelude::*;
 use crate::map::{Map, MapBuilder};
 use crate::room::Room;
 use crate::enemy::*;
-use crate::task::ControllerEvent;
+use crate::task::{GameCommand, UntypedPromise};
 
 use std::collections::HashMap;
 
@@ -59,15 +59,17 @@ impl GameState {
 		self.enemies.insert(loc, enemy);
 	}
 
-	pub fn notify_event(&mut self, event: ControllerEvent) {
+	pub fn submit_command(&mut self, event: GameCommand, promise: UntypedPromise) {
 		match event {
-			ControllerEvent::PlayerGotItem(item) => {
+			GameCommand::GivePlayerItem(item) => {
 				self.player.inventory.add(item);
+				promise.void().fulfill(());
 			}
 
-			// ControllerEvent::PlayerConsumeItem(item) => {
-			// 	self.player.inventory.take(item);
-			// }
+			GameCommand::ConsumePlayerItem(item) => {
+				let success = self.player.inventory.take(item);
+				promise.bool().fulfill(success);
+			}
 		}
 	}
 }

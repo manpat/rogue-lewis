@@ -3,7 +3,7 @@ pub mod util;
 
 use crate::prelude::*;
 use crate::game_state::GameState;
-use crate::task::{self, Coordinator, PlayerCommand, ControllerEvent, coordinator::UntypedPromise};
+use crate::task::{self, Coordinator, PlayerCommand, GameCommand, UntypedPromise};
 
 
 pub struct View {
@@ -15,7 +15,7 @@ pub struct View {
 pub enum ViewCommand {
 	GetPlayerCommand,
 	ShowMap { whole_map: bool },
-	ControllerEvent(ControllerEvent),
+	GameCommand(GameCommand),
 }
 
 
@@ -36,7 +36,7 @@ impl View {
 			match cmd {
 				ViewCommand::GetPlayerCommand => {
 					let command = get_player_command_sync();
-					promise.unwrap_player_command().fulfill(command);
+					promise.player_command().fulfill(command);
 				}
 
 				ViewCommand::ShowMap { whole_map } => {
@@ -46,15 +46,14 @@ impl View {
 						print_local_area(game_state);
 					}
 
-					promise.unwrap_void().fulfill(());
+					promise.void().fulfill(());
 				}
 
-				ViewCommand::ControllerEvent(event) => {
+				ViewCommand::GameCommand(event) => {
 					use crate::game_state::{GameState, Item};
 
 					match event {
-						// TODO: this should be done in render
-						ControllerEvent::PlayerGotItem(item) => match item {
+						GameCommand::GivePlayerItem(item) => match item {
 							Item::Food => println!("You found food!"),
 							Item::Treasure => println!("You found treasure!"),
 							Item::Key => println!("You found a key!"),
@@ -64,7 +63,11 @@ impl View {
 								println!("You found a map!");
 							}
 						}
+
+						_ => {}
 					}
+
+					promise.void().fulfill(());
 				}
 			}
 		}

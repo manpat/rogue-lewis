@@ -13,7 +13,7 @@ async fn try_move(dir: Direction) -> bool {
 
 	println!("You move {}", dir);
 
-	if !get_coordinator().hack_game_mut().player.inventory.take(Item::Food) {
+	if !task::consume_player_item(Item::Food).await {
 		get_coordinator().hack_game_mut().player.hunger -= 1;
 		if get_coordinator().hack_game_mut().player.hunger <= 0 {
 			println!("You starve to death");
@@ -64,7 +64,7 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		EncounterType::Chest => {
 			let chest_items = [Item::Food, Item::Treasure, Item::Key];
 
-			if get_coordinator().hack_game_mut().player.inventory.take(Item::Key) {
+			if task::consume_player_item(Item::Key).await {
 				let num_items = rng().gen_range(1, 5);
 				let items = chest_items.choose_multiple(&mut rng(), num_items);
 

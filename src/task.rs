@@ -7,8 +7,9 @@ pub use executor::Executor;
 pub use coordinator::Coordinator;
 
 use crate::prelude::*;
-use coordinator::*;
+
 use crate::view::ViewCommand;
+use crate::game_state::GameCommand;
 
 // pub enum ControllerMode {
 // 	Battle, Merchant
@@ -48,22 +49,16 @@ pub async fn show_map(whole_map: bool) {
 
 use crate::game_state::Item;
 
-#[derive(Copy, Clone, Debug)]
-pub enum GameCommand {
-	GivePlayerItem(crate::game_state::Item),
-	ConsumePlayerItem(crate::game_state::Item),
-}
+// TODO: consume/interact_room_encounter/item?
 
 pub async fn give_player_item(item: Item) {
-	let command = GameCommand::GivePlayerItem(item);
+	let command = GameCommand::GivePlayerItem(item, 1);
 	get_coordinator().schedule_model_command::<()>(command).await;
 	get_coordinator().schedule_view_command(ViewCommand::GameCommand(command)).await
 }
 
-// TODO: consume/interact_room_encounter/item?
-
 pub async fn consume_player_item(item: Item) -> bool {
-	let command = GameCommand::ConsumePlayerItem(item);
+	let command = GameCommand::ConsumePlayerItem(item, 1);
 
 	let success = get_coordinator().schedule_model_command(command).await;
 	if success {

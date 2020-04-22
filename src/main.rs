@@ -22,20 +22,19 @@ fn main() {
 
 	let game_state = generate_game_state();
 	let game_state = Rc::new(RefCell::new(game_state));
+	let mut view = view::View::new();
 	let mut coordinator = task::Coordinator::new(Rc::clone(&game_state));
 
 	unsafe {
 		COORDINATOR = Some(RefCell::new(coordinator.clone()));
 	}
 
-	let mut view = view::View::new(coordinator.clone());
-
 	executor.queue(controller::run_main_controller());
 
 	while executor.num_queued_tasks() > 0 {
 		executor.poll();
 		coordinator.run(&mut game_state.borrow_mut(), &mut view);
-		view.render(&game_state.borrow());
+		view.update(&game_state.borrow());
 	}
 }
 

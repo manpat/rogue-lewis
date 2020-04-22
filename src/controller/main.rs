@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use crate::controller::*;
-use crate::game_state::{GameState, Item};
+use crate::game_state::Item;
 use crate::room::EncounterType;
-use crate::task::{self, Coordinator};
+use crate::task;
 
 
 async fn try_move(dir: Direction) -> bool {

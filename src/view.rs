@@ -2,12 +2,11 @@ pub mod render_buffer;
 pub mod util;
 
 use crate::prelude::*;
-use crate::game_state::GameState;
-use crate::task::{self, Coordinator, PlayerCommand, GameCommand, UntypedPromise};
+use crate::game_state::{GameState, GameCommand};
+use crate::task::{PlayerCommand, UntypedPromise};
 
 
 pub struct View {
-	coordinator: Coordinator,
 	commands: Vec<(ViewCommand, UntypedPromise)>,
 }
 
@@ -20,9 +19,8 @@ pub enum ViewCommand {
 
 
 impl View {
-	pub fn new(coordinator: Coordinator) -> View {
+	pub fn new() -> View {
 		View {
-			coordinator,
 			commands: Vec::new(),
 		}
 	}
@@ -31,7 +29,7 @@ impl View {
 		self.commands.push((cmd, promise));
 	}
 
-	pub fn render(&mut self, game_state: &GameState) {
+	pub fn update(&mut self, game_state: &GameState) {
 		for (cmd, promise) in self.commands.drain(..) {
 			match cmd {
 				ViewCommand::GetPlayerCommand => {
@@ -50,10 +48,10 @@ impl View {
 				}
 
 				ViewCommand::GameCommand(event) => {
-					use crate::game_state::{GameState, Item};
+					use crate::game_state::Item;
 
 					match event {
-						GameCommand::GivePlayerItem(item) => match item {
+						GameCommand::GivePlayerItem(item, _) => match item {
 							Item::Food => println!("You found food!"),
 							Item::Treasure => println!("You found treasure!"),
 							Item::Key => println!("You found a key!"),

@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use crate::game_state::GameState;
+use crate::game_state::{GameState, GameCommand};
 use crate::view::{View, ViewCommand};
-use crate::task::{PlayerCommand, GameCommand};
 use crate::task::promise::*;
 
 

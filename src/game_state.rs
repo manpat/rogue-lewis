@@ -2,9 +2,17 @@ use crate::prelude::*;
 use crate::map::{Map, MapBuilder};
 use crate::room::Room;
 use crate::enemy::*;
-use crate::task::{GameCommand, UntypedPromise};
+use crate::task::UntypedPromise;
 
 use std::collections::HashMap;
+
+
+#[derive(Copy, Clone, Debug)]
+pub enum GameCommand {
+	GivePlayerItem(Item, usize),
+	ConsumePlayerItem(Item, usize),
+}
+
 
 #[derive(Debug)]
 pub struct GameState {
@@ -61,13 +69,13 @@ impl GameState {
 
 	pub fn submit_command(&mut self, event: GameCommand, promise: UntypedPromise) {
 		match event {
-			GameCommand::GivePlayerItem(item) => {
-				self.player.inventory.add(item);
+			GameCommand::GivePlayerItem(item, n) => {
+				self.player.inventory.add_n(item, n);
 				promise.void().fulfill(());
 			}
 
-			GameCommand::ConsumePlayerItem(item) => {
-				let success = self.player.inventory.take(item);
+			GameCommand::ConsumePlayerItem(item, n) => {
+				let success = self.player.inventory.take_n(item, n);
 				promise.bool().fulfill(success);
 			}
 		}

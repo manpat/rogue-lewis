@@ -1,23 +1,12 @@
 use crate::prelude::*;
 use crate::game_state::GameState;
-use crate::view::{View, ViewEvent, ViewEventType};
+use crate::view::{View, ViewCommand};
 use crate::task::{PlayerCommand, ControllerEvent};
 
 use std::task::Waker;
-use std::collections::HashMap;
-
-#[derive(Copy, Clone, Debug)]
-pub(super) enum WakeEvent {
-	GetPlayerCommand,
-	ShowMap { whole_map: bool },
-	ControllerEvent(ControllerEvent),
-}
 
 pub(super) struct Inner {
-	pub scheduled_awaits: Vec<(WakeEvent, Waker)>,
-	pub player_command: Option<PlayerCommand>,
-
-	pub scheduled_view_wakeups: HashMap<ViewEventType, Waker>,
+	pub unscheduled_view_promises: Vec<(ViewCommand, UntypedPromise)>,
 }
 
 #[derive(Clone)]
@@ -29,10 +18,7 @@ pub struct Coordinator {
 impl Coordinator {
 	pub fn new(hack_game_state: GameStateHandle) -> Coordinator {
 		let inner = Inner {
-			scheduled_awaits: Vec::new(),
-			player_command: None,
-
-			scheduled_view_wakeups: HashMap::new(),
+			unscheduled_view_promises: Vec::new(),
 		};
 
 		Coordinator {
@@ -45,67 +31,19 @@ impl Coordinator {
 	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.hack_game_state.borrow_mut() }
 
 	pub fn run(&mut self, game_state: &mut GameState, view: &mut View) {
-		let scheduled_awaits = std::mem::replace(&mut self.inner.borrow_mut().scheduled_awaits, Vec::new());
+		// TODO: pass controller events on to gamestate
 
-		for (event, waker) in scheduled_awaits {
-			match event {
-				WakeEvent::GetPlayerCommand => {
-					self.inner.borrow_mut().scheduled_view_wakeups.insert(ViewEventType::PlayerCommand, waker);
-					view.request_player_command();
-				}
-
-				WakeEvent::ShowMap { whole_map } => {
-					self.inner.borrow_mut().scheduled_view_wakeups.insert(ViewEventType::MapShown, waker);
-					view.request_show_map(whole_map);
-				}
-
-				WakeEvent::ControllerEvent(event) => {
-					game_state.notify_event(event);
-					view.notify_controller_event(event);
-
-					// TODO: waker should be woken after view is done processing it
-					waker.wake();
-				}
-			}
+		for (event, promise) in self.inner.borrow_mut().unscheduled_view_promises.drain(..) {
+			view.submit_command(event, promise);
 		}
 	}
 
-	pub fn notify_view_event(&self, event: ViewEvent) {
-		let mut inner = self.inner.borrow_mut();
-		let event_ty = event.to_type();
-
-		match event {
-			ViewEvent::PlayerCommand(cmd) => {
-				inner.player_command = Some(cmd);
-			}
-
-			_ => {}
-		}
-
-		if let Some(waker) = inner.scheduled_view_wakeups.remove(&event_ty) {
-			waker.wake();
-		}
-	}
-
-	pub(super) fn notify_controller_event(&self, event: ControllerEvent) -> impl Future<Output=()> {
-		self.schedule_event_await(WakeEvent::ControllerEvent(event))
-	}
-
-	pub(super) fn schedule_value_await<F, O>(&self, event: WakeEvent, try_get_result: F) -> impl Future<Output=O>
-		where F: Fn(&mut Inner) -> Option<O>
+	pub(super) fn schedule_view_command<O>(&self, cmd: ViewCommand) -> impl Future<Output=O>
+		where O: Promisable, Promise<O>: Into<UntypedPromise>
 	{
-		WakeEventCallbackFuture {
+		ViewCommandFuture {
 			inner: Rc::clone(&self.inner),
-			event, try_get_result
-		}
-	}
-
-	pub(super) fn schedule_event_await(&self, event: WakeEvent) -> impl Future<Output=()>
-	{
-		WakeEventFuture {
-			inner: Rc::clone(&self.inner),
-			event,
-			scheduled: false
+			state: ViewCommandFutureState::Command(cmd)
 		}
 	}
 }
@@ -117,42 +55,144 @@ impl Coordinator {
 use std::task::Poll;
 use std::pin::Pin;
 
-struct WakeEventCallbackFuture<F, O> where F: Fn(&mut Inner) -> Option<O> {
-	inner: Rc<RefCell<Inner>>,
-	event: WakeEvent,
-	try_get_result: F
+
+enum ViewCommandFutureState<O: Promisable> {
+	Command(ViewCommand),
+	Future(FutureValue<O>)
 }
 
-impl<F, O> Future for WakeEventCallbackFuture<F, O> where F: Fn(&mut Inner) -> Option<O> {
+struct ViewCommandFuture<O: Promisable> {
+	inner: Rc<RefCell<Inner>>,
+	state: ViewCommandFutureState<O>,
+}
+
+impl<O: Promisable> Future for ViewCommandFuture<O> where Promise<O>: Into<UntypedPromise> {
 	type Output = O;
 
-	fn poll(self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-		let mut inner = self.inner.borrow_mut();
-		if let Some(cmd) = (self.try_get_result)(&mut inner) {
-			Poll::Ready(cmd)
-		} else {
-			inner.scheduled_awaits.push((self.event, ctx.waker().clone()));
-			Poll::Pending
-		}
-	}
-}
-
-struct WakeEventFuture {
-	inner: Rc<RefCell<Inner>>,
-	event: WakeEvent,
-	scheduled: bool
-}
-
-impl Future for WakeEventFuture {
-	type Output = ();
-
 	fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
-		if self.scheduled {
-			Poll::Ready(())
-		} else {
-			self.scheduled = true;
-			self.inner.borrow_mut().scheduled_awaits.push((self.event, ctx.waker().clone()));
-			Poll::Pending
+		match self.state {
+			ViewCommandFutureState::Future(ref mut future) => {
+				if future.ready() {
+					Poll::Ready(future.unwrap())
+				} else {
+					Poll::Pending
+				}
+			}
+
+			ViewCommandFutureState::Command(event) => {
+				let promise = O::new_promise(ctx.waker().clone());
+				let future = promise.get_future();
+
+				self.inner.borrow_mut().unscheduled_view_promises.push((event, promise.into()));
+				self.state = ViewCommandFutureState::Future(future);
+
+				Poll::Pending
+			}
 		}
 	}
+}
+
+
+struct PromiseState<T> {
+	value: Option<T>,
+}
+
+pub struct FutureValue<T> {
+	inner: Rc<RefCell<PromiseState<T>>>,
+}
+
+impl<T> FutureValue<T> {
+	pub fn ready(&self) -> bool { self.inner.borrow().value.is_some() }
+
+	pub fn unwrap(&mut self) -> T {
+		self.inner.borrow_mut().value.take()
+			.expect("Value not ready yet")
+	}
+}
+
+pub struct Promise<T> {
+	inner: Rc<RefCell<PromiseState<T>>>,
+	waker: Waker,
+}
+
+impl<T> Promise<T> {
+	pub fn new(waker: Waker) -> Promise<T> {
+		let state = PromiseState { value: None };
+
+		Promise {
+			inner: Rc::new(RefCell::new(state)),
+			waker,
+		}
+	}
+
+	pub fn get_future(&self) -> FutureValue<T> {
+		FutureValue {
+			inner: Rc::clone(&self.inner)
+		}
+	}
+
+	pub fn fulfill(self, value: T) {
+		let mut inner = self.inner.borrow_mut();
+		assert!(inner.value.is_none(), "Promise has already been fulfilled");
+
+		inner.value = Some(value);
+		self.waker.wake();
+	}
+}
+
+
+
+pub enum UntypedPromise {
+	Void(Promise<()>),
+	String(Promise<String>),
+	PlayerCommand(Promise<PlayerCommand>),
+}
+
+impl UntypedPromise {
+	pub fn unwrap_void(self) -> Promise<()> {
+		match self {
+			UntypedPromise::Void(promise) => promise,
+			_ => panic!("Failed to unwrap untyped promise to ()")
+		}
+	}
+
+	pub fn unwrap_string(self) -> Promise<String> {
+		match self {
+			UntypedPromise::String(promise) => promise,
+			_ => panic!("Failed to unwrap untyped promise to String")
+		}
+	}
+
+	pub fn unwrap_player_command(self) -> Promise<PlayerCommand> {
+		match self {
+			UntypedPromise::PlayerCommand(promise) => promise,
+			_ => panic!("Failed to unwrap untyped promise to PlayerCommand")
+		}
+	}
+}
+
+
+pub trait Promisable: Sized {
+	fn new_promise(waker: Waker) -> Promise<Self>;
+}
+
+impl Promisable for () {
+	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
+}
+impl Promisable for String {
+	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
+}
+impl Promisable for PlayerCommand {
+	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
+}
+
+
+impl From<Promise<()>> for UntypedPromise {
+	fn from(o: Promise<()>) -> UntypedPromise { UntypedPromise::Void(o) }
+}
+impl From<Promise<String>> for UntypedPromise {
+	fn from(o: Promise<String>) -> UntypedPromise { UntypedPromise::String(o) }
+}
+impl From<Promise<PlayerCommand>> for UntypedPromise {
+	fn from(o: Promise<PlayerCommand>) -> UntypedPromise { UntypedPromise::PlayerCommand(o) }
 }

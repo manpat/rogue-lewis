@@ -30,6 +30,7 @@ async fn try_move(dir: Direction) -> bool {
 
 	get_coordinator().hack_game_mut().map.mark_visited(player_pos);
 
+	// TODO: leaving should be optional
 	if current_room.is_exit {
 		println!("You found the exit!");
 		return true
@@ -59,6 +60,7 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		EncounterType::Key => task::give_player_item(Item::Key).await,
 		EncounterType::Map => task::give_player_item(Item::Map).await,
 
+		// TODO: Chest should be optionally
 		EncounterType::Chest => {
 			let chest_items = [Item::Food, Item::Treasure, Item::Key];
 
@@ -71,8 +73,6 @@ async fn run_encounter(encounter_ty: EncounterType) {
 
 				for item in items {
 					task::give_player_item(*item).await;
-					// println!("You found a {:?}", item);
-					// get_coordinator().hack_game_mut().player.inventory.add(*item);
 				}
 
 			} else {
@@ -117,6 +117,7 @@ pub async fn run_main_controller() {
 	task::show_map(false).await;
 
 	'main_loop: loop {
+		// TODO: this should be moved to view, when input is requested
 		println!("Which way do you go?");
 
 		loop {

@@ -3,37 +3,19 @@ pub mod util;
 
 use crate::prelude::*;
 use crate::game_state::GameState;
-use crate::task::{self, Coordinator, PlayerCommand, ControllerEvent};
+use crate::task::{self, Coordinator, PlayerCommand, ControllerEvent, coordinator::UntypedPromise};
 
 
 pub struct View {
 	coordinator: Coordinator,
-	show_map_request: Option<bool>,
-	player_command_request: bool,
+	commands: Vec<(ViewCommand, UntypedPromise)>,
 }
 
-
-pub enum ViewEvent {
-	PlayerCommand(task::PlayerCommand),
-	MapShown,
-	ModeChanged,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ViewEventType {
-	PlayerCommand,
-	MapShown,
-	ModeChanged,
-}
-
-impl ViewEvent {
-	pub fn to_type(&self) -> ViewEventType {
-		match self {
-			ViewEvent::PlayerCommand(_) => ViewEventType::PlayerCommand,
-			ViewEvent::MapShown => ViewEventType::MapShown,
-			ViewEvent::ModeChanged => ViewEventType::ModeChanged,
-		}
-	}
+#[derive(Copy, Clone)]
+pub enum ViewCommand {
+	GetPlayerCommand,
+	ShowMap { whole_map: bool },
+	ControllerEvent(ControllerEvent),
 }
 
 
@@ -41,52 +23,50 @@ impl View {
 	pub fn new(coordinator: Coordinator) -> View {
 		View {
 			coordinator,
-			show_map_request: None,
-			player_command_request: false,
+			commands: Vec::new(),
 		}
 	}
 
-	pub fn request_show_map(&mut self, whole_map: bool) {
-		self.show_map_request = Some(whole_map);
-	}
-
-	pub fn request_player_command(&mut self) {
-		self.player_command_request = true;
-	}
-
-	pub fn notify_controller_event(&mut self, event: ControllerEvent) {
-		use crate::game_state::{GameState, Item};
-
-		match event {
-			// TODO: this should be done in render
-			ControllerEvent::PlayerGotItem(item) => match item {
-				Item::Food => println!("You found food!"),
-				Item::Treasure => println!("You found treasure!"),
-				Item::Key => println!("You found a key!"),
-				Item::Map => {
-					// TODO: println!("You found another map. It may have some value");
-					// how do I find out if player already had a map?
-					println!("You found a map!");
-				}
-			}
-		}
+	pub fn submit_command(&mut self, cmd: ViewCommand, promise: UntypedPromise) {
+		self.commands.push((cmd, promise));
 	}
 
 	pub fn render(&mut self, game_state: &GameState) {
-		if let Some(whole_map) = self.show_map_request.take() {
-			if whole_map {
-				print_map(game_state);
-			} else {
-				print_local_area(game_state);
+		for (cmd, promise) in self.commands.drain(..) {
+			match cmd {
+				ViewCommand::GetPlayerCommand => {
+					let command = get_player_command_sync();
+					promise.unwrap_player_command().fulfill(command);
+				}
+
+				ViewCommand::ShowMap { whole_map } => {
+					if whole_map {
+						print_map(game_state);
+					} else {
+						print_local_area(game_state);
+					}
+
+					promise.unwrap_void().fulfill(());
+				}
+
+				ViewCommand::ControllerEvent(event) => {
+					use crate::game_state::{GameState, Item};
+
+					match event {
+						// TODO: this should be done in render
+						ControllerEvent::PlayerGotItem(item) => match item {
+							Item::Food => println!("You found food!"),
+							Item::Treasure => println!("You found treasure!"),
+							Item::Key => println!("You found a key!"),
+							Item::Map => {
+								// TODO: println!("You found another map. It may have some value");
+								// how do I find out if player already had a map?
+								println!("You found a map!");
+							}
+						}
+					}
+				}
 			}
-
-			self.coordinator.notify_view_event(ViewEvent::MapShown);
-		}
-
-		if self.player_command_request {
-			self.player_command_request = false;
-			let command = get_player_command_sync();
-			self.coordinator.notify_view_event(ViewEvent::PlayerCommand(command));
 		}
 	}
 }

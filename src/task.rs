@@ -6,6 +6,7 @@ pub use coordinator::Coordinator;
 
 use crate::prelude::*;
 use coordinator::*;
+use crate::view::ViewCommand;
 
 // pub enum ControllerMode {
 // 	Battle, Merchant
@@ -33,13 +34,13 @@ pub struct PlayerCommand(pub String);
 
 pub async fn get_player_command() -> PlayerCommand {
 	get_coordinator()
-		.schedule_value_await(WakeEvent::GetPlayerCommand, |inner| inner.player_command.take())
+		.schedule_view_command(ViewCommand::GetPlayerCommand)
 		.await
 }
 
 pub async fn show_map(whole_map: bool) {
 	get_coordinator()
-		.schedule_event_await(WakeEvent::ShowMap {whole_map})
+		.schedule_view_command(ViewCommand::ShowMap {whole_map})
 		.await
 }
 
@@ -53,9 +54,11 @@ pub enum ControllerEvent {
 
 pub async fn give_player_item(item: Item) {
 	get_coordinator()
-		.notify_controller_event(ControllerEvent::PlayerGotItem(item))
+		.schedule_view_command(ViewCommand::ControllerEvent(ControllerEvent::PlayerGotItem(item)))
 		.await
 }
+
+// TODO: consume/interact_room_encounter/item?
 
 // TODO: how does failure information get back to the future?
 // and how does it do so before the view responds?

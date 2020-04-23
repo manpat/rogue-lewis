@@ -1,25 +1,23 @@
 use crate::prelude::*;
 use crate::controller::*;
-use crate::game_state::Item;
+use crate::game_state::{Item, HealthModifyReason};
 use crate::room::EncounterType;
 use crate::task;
 
 
 async fn try_move(dir: Direction) -> bool {
-	if !get_coordinator().hack_game_mut().try_move_player(dir) {
+	if !task::move_player(dir).await {
 		println!("You can't go that way");
-		return false
+		return false;
 	}
 
-	println!("You move {}", dir);
-
 	if !task::consume_player_item(Item::Food).await {
-		get_coordinator().hack_game_mut().player.hunger -= 1;
-		if get_coordinator().hack_game_mut().player.hunger <= 0 {
+		if !task::damage_player(1, HealthModifyReason::Hunger).await {
 			println!("You starve to death");
 			return true
 		} else {
-			println!("You have run out of food! You can travel {} rooms", get_coordinator().hack_game_mut().player.hunger);
+			println!("You have run out of food! You can travel {} rooms",
+				get_coordinator().hack_game_mut().player.hunger);
 		}
 	} else {
 		get_coordinator().hack_game_mut().player.hunger = 10;
@@ -52,8 +50,6 @@ async fn try_move(dir: Direction) -> bool {
 async fn run_encounter(encounter_ty: EncounterType) {
 	println!("]]] running encounter {:?}", encounter_ty);
 
-	let player_loc = get_coordinator().hack_game().player.location;
-
 	match encounter_ty {
 		EncounterType::Food => task::give_player_item(Item::Food).await,
 		EncounterType::Treasure => task::give_player_item(Item::Treasure).await,
@@ -81,19 +77,21 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		}
 
 		EncounterType::Monster => {
+			let player_loc = get_coordinator().hack_game().player.location;
 			if get_coordinator().hack_game_mut().get_enemy(player_loc).is_none() {
 				get_coordinator().hack_game_mut().spawn_enemy_at(player_loc, false);
 			}
 
-			run_battle_controller(player_loc).await;
+			run_battle_controller().await;
 		}
 
 		EncounterType::Boss => {
+			let player_loc = get_coordinator().hack_game().player.location;
 			if get_coordinator().hack_game_mut().get_enemy(player_loc).is_none() {
 				get_coordinator().hack_game_mut().spawn_enemy_at(player_loc, true);
 			}
 
-			run_battle_controller(player_loc).await;
+			run_battle_controller().await;
 		}
 
 		EncounterType::Merchant => {
@@ -116,7 +114,7 @@ pub async fn run_main_controller() {
 	// TODO: this doesn't make sense for a retained mode view
 	task::show_map(false).await;
 
-	'main_loop: loop {
+	'main_loop: while !get_coordinator().hack_game().player.is_dead() {
 		// TODO: this should be moved to view, when input is requested
 		println!("Which way do you go?");
 
@@ -174,7 +172,7 @@ pub async fn run_main_controller() {
 						let loc = get_coordinator().hack_game_mut().player.location;
 						get_coordinator().hack_game_mut().spawn_enemy_at(loc, random());
 
-						run_battle_controller(loc).await
+						run_battle_controller().await
 					}
 
 					["merchant"] => {
@@ -200,7 +198,13 @@ pub async fn run_main_controller() {
 
 				"h" | "help" => print_help(),
 
-				// TODO: eat | heal
+				"heal" | "eat" => {
+					if task::consume_player_item(Item::Food).await {
+						task::heal_player(rng().gen_range(1, 4)).await;
+					} else {
+						println!("You don't have enough food!");
+					}
+				}
 
 				// "r" | "restart" => Some(Event::Restart),
 				"q" | "quit" => break 'main_loop,

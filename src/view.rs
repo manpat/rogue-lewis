@@ -48,7 +48,8 @@ impl View {
 				}
 
 				ViewCommand::GameCommand(event) => {
-					use crate::game_state::Item;
+					use crate::game_state::{Item, HealthModifyReason};
+					use std::cmp::Ordering;
 
 					match event {
 						GameCommand::GivePlayerItem(item, _) => match item {
@@ -60,6 +61,30 @@ impl View {
 								// how do I find out if player already had a map?
 								println!("You found a map!");
 							}
+						}
+
+						GameCommand::ModifyPlayerHealth(n, reason) => match n.cmp(&0) {
+							Ordering::Greater => {
+								println!("You gained {} health", n);
+							}
+
+							Ordering::Less => match reason {
+								HealthModifyReason::Attack => {
+									println!("You lost {} health!", -n);
+								}
+
+								HealthModifyReason::Hunger => {
+									println!("Your hunger cost you {} health.", -n);
+								}
+
+								_ => {}
+							}
+
+							Ordering::Equal => {}
+						}
+
+						GameCommand::MovePlayer(dir) => {
+							println!("You move {}", dir);
 						}
 
 						_ => {}

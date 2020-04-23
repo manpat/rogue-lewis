@@ -6,11 +6,20 @@ use crate::task::UntypedPromise;
 
 use std::collections::HashMap;
 
+#[derive(Copy, Clone, Debug)]
+pub enum HealthModifyReason {
+	Heal,
+	Attack,
+	Hunger,
+}
+
 
 #[derive(Copy, Clone, Debug)]
 pub enum GameCommand {
 	GivePlayerItem(Item, usize),
 	ConsumePlayerItem(Item, usize),
+	ModifyPlayerHealth(i32, HealthModifyReason),
+	MovePlayer(Direction),
 }
 
 
@@ -77,6 +86,15 @@ impl GameState {
 			GameCommand::ConsumePlayerItem(item, n) => {
 				let success = self.player.inventory.take_n(item, n);
 				promise.bool().fulfill(success);
+			}
+
+			GameCommand::ModifyPlayerHealth(n, _) => {
+				self.player.health += n;
+				promise.bool().fulfill(self.player.health > 0);
+			}
+
+			GameCommand::MovePlayer(dir) => {
+				promise.bool().fulfill(self.try_move_player(dir));
 			}
 		}
 	}

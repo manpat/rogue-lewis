@@ -3,6 +3,7 @@ use crate::map::{Map, MapBuilder};
 use crate::room::Room;
 use crate::enemy::*;
 use crate::task::UntypedPromise;
+use crate::item::*;
 
 use std::collections::HashMap;
 
@@ -126,19 +127,17 @@ impl Player {
 		}
 	}
 
-	pub fn attack(&self) -> i32 { 2 }
-	pub fn defense(&self) -> i32 { 0 }
+	pub fn attack(&self) -> i32 {
+		let weapon_stat: i32 = self.inventory.iter_equipment()
+			.map(Equipment::attack_bonus).sum();
+
+		2 + weapon_stat
+	}
+	pub fn defense(&self) -> i32 {
+		self.inventory.iter_equipment().map(Equipment::defense_bonus).sum()
+	}
 
 	pub fn is_dead(&self) -> bool { self.health <= 0 }
-}
-
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum Item {
-	Food,
-	Treasure,
-	Map,
-	Key,
 }
 
 
@@ -200,4 +199,12 @@ impl Inventory {
 	}
 
 	pub fn has(&self, item: Item) -> bool { self.count(item) > 0 }
+
+	pub fn iter_equipment(&self) -> impl Iterator<Item=Equipment> + '_ {
+		self.items.iter()
+			.filter_map(|i| match i {
+				Item::Equipment(e) => Some(*e),
+				_ => None,
+			})
+	}
 }

@@ -2,6 +2,7 @@ use crate::prelude::*;
 use crate::controller::*;
 use crate::game_state::*;
 use crate::enemy::*;
+use crate::item::*;
 use crate::task;
 
 #[derive(Debug)]

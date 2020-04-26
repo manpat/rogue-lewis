@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::controller::*;
-use crate::game_state::{Item, HealthModifyReason};
+use crate::game_state::HealthModifyReason;
+use crate::item::*;
 use crate::room::EncounterType;
 use crate::task;
 
@@ -71,9 +72,14 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		EncounterType::Key => task::give_player_item(Item::Key).await,
 		EncounterType::Map => task::give_player_item(Item::Map).await,
 
+		EncounterType::Equipment => task::give_player_item(Item::Equipment(random())).await,
+
 		// TODO: Chest should be optionally
 		EncounterType::Chest => {
-			let chest_items = [Item::Food, Item::Treasure, Item::Key];
+			let chest_items = [
+				Item::Food, Item::Treasure, Item::Key,
+				Item::Potion, Item::Equipment(random())
+			];
 
 			if task::consume_player_item(Item::Key).await {
 				let num_items = rng().gen_range(1, 5);

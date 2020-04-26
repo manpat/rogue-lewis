@@ -60,7 +60,8 @@ impl View {
 				}
 
 				ViewCommand::GameCommand(event) => {
-					use crate::game_state::{Item, HealthModifyReason};
+					use crate::game_state::HealthModifyReason;
+					use crate::item::Item;
 					use std::cmp::Ordering;
 
 					match event {
@@ -72,6 +73,13 @@ impl View {
 								// TODO: println!("You found another map. It may have some value");
 								// how do I find out if player already had a map?
 								println!("You found a map!");
+							}
+
+							Item::Potion => println!("You found a potion"),
+
+							Item::Equipment(e) => {
+								// TODO: a/an obvs doesn't work
+								println!("You found a {:?}", e);
 							}
 						}
 
@@ -150,19 +158,19 @@ fn get_player_command_sync(controller_mode: ControllerMode) -> PlayerCommand {
 		std::io::stdout().flush()
 			.expect("Failed to flush");
 
-		let mut command = std::io::stdin().lock()
+		let mut command_str = std::io::stdin().lock()
 			.lines().next()
 			.expect("EOF")
 			.expect("Failed to read stdin");
 
-		if command.is_empty() {
+		if command_str.is_empty() {
 			continue;
 		}
 
-		command.make_ascii_lowercase();
+		command_str.make_ascii_lowercase();
 
-		if command.starts_with("d ") {
-			let parts = command[2..]
+		if command_str.starts_with("d ") {
+			let parts = command_str[2..]
 				.split_whitespace()
 				.map(str::to_owned)
 				.collect();
@@ -171,14 +179,14 @@ fn get_player_command_sync(controller_mode: ControllerMode) -> PlayerCommand {
 		}
 
 		if let Some(command) = match controller_mode {
-			Main => parse_main_player_command(&command),
-			Battle => parse_battle_player_command(&command),
-			Merchant => parse_merchant_player_command(&command),
+			Main => parse_main_player_command(&command_str),
+			Battle => parse_battle_player_command(&command_str),
+			Merchant => parse_merchant_player_command(&command_str),
 		} {
 			break command
 		}
 
-		println!("what does '{}' mean??", command);
+		println!("what does '{}' mean??", command_str);
 	}
 }
 
@@ -219,7 +227,7 @@ fn parse_battle_player_command(cmd: &str) -> Option<PlayerCommand> {
 
 fn parse_merchant_player_command(cmd: &str) -> Option<PlayerCommand> {
 	use crate::controller::merchant::PlayerCommand::*;
-	use crate::game_state::Item;
+	use crate::item::{Item, Equipment};
 
 	let cmd = match cmd {
 		"b food" => BuyItem(Item::Food),

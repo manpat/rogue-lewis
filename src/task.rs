@@ -81,7 +81,8 @@ pub async fn show_map(whole_map: bool) {
 		.await
 }
 
-use crate::game_state::{Item, HealthModifyReason};
+use crate::game_state::HealthModifyReason;
+use crate::item::Item;
 
 // TODO: consume/interact_room_encounter/item?
 

@@ -1,6 +1,6 @@
 // use crate::prelude::*;
 use crate::task;
-use crate::game_state::Item;
+use crate::item::{Item, Equipment};
 
 
 #[derive(Debug)]
@@ -17,6 +17,9 @@ fn item_cost(item: Item) -> usize {
 		Item::Food => 1,
 		Item::Map => 3,
 		Item::Key => 5,
+		Item::Potion => 5,
+
+		Item::Equipment(_) => 5,
 
 		Item::Treasure => panic!("Treasure has no cost"),
 	}

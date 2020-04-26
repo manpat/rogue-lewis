@@ -9,6 +9,7 @@ mod task;
 mod types;
 mod game_state;
 mod map;
+mod item;
 mod room;
 mod view;
 mod controller;

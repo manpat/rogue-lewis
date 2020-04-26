@@ -3,11 +3,12 @@ pub mod util;
 
 use crate::prelude::*;
 use crate::game_state::{GameState, GameCommand};
-use crate::task::{PlayerCommand, UntypedPromise};
+use crate::task::{PlayerCommand, UntypedPromise, ControllerMode};
 
 
 pub struct View {
 	commands: Vec<(ViewCommand, UntypedPromise)>,
+	controller_mode_stack: Vec<ControllerMode>,
 }
 
 #[derive(Copy, Clone)]
@@ -15,6 +16,8 @@ pub enum ViewCommand {
 	GetPlayerCommand,
 	ShowMap { whole_map: bool },
 	GameCommand(GameCommand),
+	PushControllerMode(ControllerMode),
+	PopControllerMode,
 }
 
 
@@ -22,6 +25,7 @@ impl View {
 	pub fn new() -> View {
 		View {
 			commands: Vec::new(),
+			controller_mode_stack: Vec::new(),
 		}
 	}
 
@@ -29,11 +33,19 @@ impl View {
 		self.commands.push((cmd, promise));
 	}
 
+	pub fn current_controller_mode(&self) -> ControllerMode {
+		self.controller_mode_stack.last()
+			.cloned()
+			.expect("Empty controller stack!")
+	}
+
 	pub fn update(&mut self, game_state: &GameState) {
-		for (cmd, promise) in self.commands.drain(..) {
+		let commands = std::mem::replace(&mut self.commands, Vec::new());
+
+		for (cmd, promise) in commands {
 			match cmd {
 				ViewCommand::GetPlayerCommand => {
-					let command = get_player_command_sync();
+					let command = get_player_command_sync(self.current_controller_mode());
 					promise.player_command().fulfill(command);
 				}
 
@@ -92,6 +104,20 @@ impl View {
 
 					promise.void().fulfill(());
 				}
+
+				ViewCommand::PushControllerMode(mode) => {
+					self.controller_mode_stack.push(mode);
+					println!("[view] mode transition -> {:?}", self.controller_mode_stack);
+
+					promise.void().fulfill(());
+				}
+
+				ViewCommand::PopControllerMode => {
+					self.controller_mode_stack.pop();
+					println!("[view] mode transition {:?} <-", self.controller_mode_stack);
+
+					promise.void().fulfill(());
+				}
 			}
 		}
 	}
@@ -114,8 +140,9 @@ fn print_local_area(state: &GameState) {
 	println!("=============");
 }
 
-fn get_player_command_sync() -> PlayerCommand {
+fn get_player_command_sync(controller_mode: ControllerMode) -> PlayerCommand {
 	use std::io::{Write, BufRead};
+	use ControllerMode::*;
 
 	loop {
 		print!("> ");
@@ -128,10 +155,86 @@ fn get_player_command_sync() -> PlayerCommand {
 			.expect("EOF")
 			.expect("Failed to read stdin");
 
-
-		if !command.is_empty() {
-			command.make_ascii_lowercase();
-			break PlayerCommand(command)
+		if command.is_empty() {
+			continue;
 		}
+
+		command.make_ascii_lowercase();
+
+		if command.starts_with("d ") {
+			let parts = command[2..]
+				.split_whitespace()
+				.map(str::to_owned)
+				.collect();
+
+			break PlayerCommand::Debug(parts)
+		}
+
+		if let Some(command) = match controller_mode {
+			Main => parse_main_player_command(&command),
+			Battle => parse_battle_player_command(&command),
+			Merchant => parse_merchant_player_command(&command),
+		} {
+			break command
+		}
+
+		println!("what does '{}' mean??", command);
 	}
+}
+
+
+fn parse_main_player_command(cmd: &str) -> Option<PlayerCommand> {
+	use crate::controller::main::PlayerCommand::*;
+
+	let cmd = match cmd {
+		"n" | "north" => GoNorth,
+		"e" | "east" => GoEast,
+		"s" | "south" => GoSouth,
+		"w" | "west" => GoWest,
+		"m" | "map" => ShowMap,
+
+		"heal" | "eat" => Heal,
+
+		// "r" | "restart" => Some(Event::Restart),
+		"q" | "quit" => Quit,
+		_ => return None
+	};
+
+
+	Some(PlayerCommand::Main(cmd))
+}
+
+fn parse_battle_player_command(cmd: &str) -> Option<PlayerCommand> {
+	use crate::controller::battle::PlayerCommand::*;
+
+	let cmd = match cmd {
+		"f" | "fight" => Attack,
+		"e" | "eat" | "h" | "heal" => Heal,
+		"r" | "run" | "flee" => Flee,
+		_ => return None
+	};
+
+	Some(PlayerCommand::Battle(cmd))
+}
+
+fn parse_merchant_player_command(cmd: &str) -> Option<PlayerCommand> {
+	use crate::controller::merchant::PlayerCommand::*;
+	use crate::game_state::Item;
+
+	let cmd = match cmd {
+		"b food" => BuyItem(Item::Food),
+		"b map" => BuyItem(Item::Map),
+		"b key" => BuyItem(Item::Key),
+
+		"s food" => SellItem(Item::Food),
+		"s map" => SellItem(Item::Map),
+		"s key" => SellItem(Item::Key),
+
+		"l" | "leave" => Leave,
+
+		_ => return None
+	};
+
+
+	Some(PlayerCommand::Merchant(cmd))
 }

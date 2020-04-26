@@ -7,7 +7,7 @@ use crate::task;
 #[derive(Debug)]
 pub struct BattleController {
 	location: Location,
-	enemy: Option<Enemy>,
+	enemy: Enemy,
 }
 
 
@@ -18,14 +18,18 @@ enum AttackSeverity {
 	Miss,
 }
 
+#[derive(Debug)]
+pub enum PlayerCommand {
+	Attack, Heal, Flee,
+}
+
 
 impl BattleController {
-	pub fn new(location: Location) -> BattleController {
-		BattleController { location, enemy: None }
+	pub fn new(location: Location, enemy: Enemy) -> BattleController {
+		BattleController { location, enemy }
 	}
 
-	fn enemy_archetype(&self) -> EnemyArchetype { self.enemy.unwrap().archetype }
-	fn is_enemy_boss(&self) -> bool { self.enemy_archetype().is_boss() }
+	fn is_enemy_boss(&self) -> bool { self.enemy.archetype.is_boss() }
 
 	async fn run_player_attack(&mut self) -> Option<Event> {
 		use std::cmp::Ordering;
@@ -50,7 +54,7 @@ impl BattleController {
 			}
 
 			Ordering::Equal => {
-				println!("Your weapons clash and neither you nor the {:?} take damage", self.enemy_archetype());
+				println!("Your weapons clash and neither you nor the {:?} take damage", self.enemy.archetype);
 				None
 			}
 
@@ -94,7 +98,7 @@ impl BattleController {
 
 
 	async fn apply_player_attack(&mut self, severity: AttackSeverity) -> Option<Event> {
-		let enemy_archetype = self.enemy_archetype();
+		let enemy_archetype = self.enemy.archetype;
 		let mut damage = get_coordinator().hack_game().player.attack();
 
 		match severity {
@@ -121,10 +125,9 @@ impl BattleController {
 			damage -= enemy_defense;
 		}
 
-		let enemy = self.enemy.as_mut().unwrap();
-		enemy.health -= damage.max(0);
+		self.enemy.health -= damage.max(0);
 
-		if enemy.is_dead() {
+		if self.enemy.is_dead() {
 			println!("The strike is fatal! The {:?} is defeated!", enemy_archetype);
 			Some(Event::Leave)
 		} else {
@@ -134,21 +137,20 @@ impl BattleController {
 
 
 	async fn apply_enemy_attack(&self, severity: AttackSeverity, ignore_shield: bool) -> Option<Event> {
-		let enemy_archetype = self.enemy_archetype();
-		let mut damage = enemy_archetype.attack();
+		let mut damage = self.enemy.archetype.attack();
 
 		match severity {
 			AttackSeverity::Crit => {
-				println!("The {:?} strikes you and you take critical damage!", enemy_archetype);
+				println!("The {:?} strikes you and you take critical damage!", self.enemy.archetype);
 				damage *= 2;
 			}
 
 			AttackSeverity::Hit => {
-				println!("The {:?} strikes you!", enemy_archetype);
+				println!("The {:?} strikes you!", self.enemy.archetype);
 			}
 
 			AttackSeverity::Miss => {
-				println!("The {:?} swings at you but misses", enemy_archetype);
+				println!("The {:?} swings at you but misses", self.enemy.archetype);
 				return None
 			}
 		}
@@ -175,16 +177,12 @@ pub async fn run_battle_controller() {
 	println!("[battle] enter");
 
 	let loc = get_coordinator().hack_game().player.location;
-
-	let ctx = get_coordinator().clone();
-	let mut ctl = BattleController::new(loc);
-
-	let enemy = ctx.hack_game().get_enemy(loc)
+	let enemy = get_coordinator().hack_game().get_enemy(loc)
 		.expect("Tried to start battle with no enemy");
 
-	ctl.enemy = Some(enemy);
+	let mut ctl = BattleController::new(loc, enemy);
 
-	if enemy.archetype.is_boss() {
+	if ctl.enemy.archetype.is_boss() {
 		println!("Oh fuck it's a boss!");
 		println!("The {:?} sets its eyes on you", enemy.archetype);
 	} else {
@@ -194,11 +192,11 @@ pub async fn run_battle_controller() {
 
 	println!("Do you fight or run like a coward?");
 
-	loop {
+	while !ctl.enemy.is_dead() {
 		let command = task::get_player_command().await;
 
-		match command.0.as_str() {
-			"f" | "fight" => match ctl.run_player_attack().await {
+		match command.battle().unwrap() {
+			PlayerCommand::Attack => match ctl.run_player_attack().await {
 				Some(Event::Lose) => {
 					println!("lose??");
 					break
@@ -209,7 +207,7 @@ pub async fn run_battle_controller() {
 				_ => {}
 			}
 
-			"e" | "eat" | "h" | "heal" => {
+			PlayerCommand::Heal => {
 				if task::consume_player_item(Item::Food).await {
 					task::heal_player(rng().gen_range(1, 4)).await;
 
@@ -223,7 +221,7 @@ pub async fn run_battle_controller() {
 				}
 			}
 
-			"r" | "run" | "flee" => {
+			PlayerCommand::Flee => {
 				println!("You flee like the coward you are");
 				if let Some(Event::Lose) = ctl.run_enemy_attack_during_flee().await {
 					println!("you lose?");
@@ -231,21 +229,13 @@ pub async fn run_battle_controller() {
 
 				break;
 			}
-
-			_ => {
-				println!("the fuck that mean?");
-			}
 		}
 	}
 
-	if let Some(enemy) = ctl.enemy {
-		if enemy.health > 0 {
-			ctx.hack_game_mut().update_enemy(loc, enemy);
-		} else {
-			ctx.hack_game_mut().remove_encounter_at(loc);
-		}
+	if ctl.enemy.health > 0 {
+		get_coordinator().hack_game_mut().update_enemy(loc, ctl.enemy);
 	} else {
-		ctx.hack_game_mut().remove_encounter_at(loc);	
+		get_coordinator().hack_game_mut().remove_encounter_at(loc);
 	}
 
 	println!("[battle] leave");

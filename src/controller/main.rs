@@ -5,6 +5,21 @@ use crate::room::EncounterType;
 use crate::task;
 
 
+#[derive(Debug)]
+pub enum PlayerCommand {
+	GoNorth,
+	GoEast,
+	GoSouth,
+	GoWest,
+
+	Heal,
+
+	ShowMap,
+	Quit,
+}
+
+
+
 async fn try_move(dir: Direction) -> bool {
 	if !task::move_player(dir).await {
 		println!("You can't go that way");
@@ -82,7 +97,9 @@ async fn run_encounter(encounter_ty: EncounterType) {
 				get_coordinator().hack_game_mut().spawn_enemy_at(player_loc, false);
 			}
 
+			task::enter_mode(task::ControllerMode::Battle).await;
 			run_battle_controller().await;
+			task::leave_mode().await;
 		}
 
 		EncounterType::Boss => {
@@ -91,25 +108,26 @@ async fn run_encounter(encounter_ty: EncounterType) {
 				get_coordinator().hack_game_mut().spawn_enemy_at(player_loc, true);
 			}
 
+			task::enter_mode(task::ControllerMode::Battle).await;
 			run_battle_controller().await;
+			task::leave_mode().await;
 		}
 
 		EncounterType::Merchant => {
+			task::enter_mode(task::ControllerMode::Merchant).await;
 			run_merchant_controller().await;
+			task::leave_mode().await;
 		}		
 
 		_ => {}
 	}
 }
 
-fn print_help() {
-	println!("pls implement help");
-}
-
-
 
 pub async fn run_main_controller() {
 	println!("[main] enter");
+
+	task::enter_mode(task::ControllerMode::Main).await;
 
 	// TODO: this doesn't make sense for a retained mode view
 	task::show_map(false).await;
@@ -120,9 +138,8 @@ pub async fn run_main_controller() {
 
 		loop {
 			let command = task::get_player_command().await;
-			let command: Vec<&str> = command.0.split_whitespace().collect();
 
-			if command[0] == "d" {
+			if let Some(command) = command.debug() {
 				let coordinator = get_coordinator().clone();
 				let mut state = coordinator.hack_game_mut();
 				use crate::room::Room;
@@ -130,7 +147,9 @@ pub async fn run_main_controller() {
 				let ply_loc = state.player.location;
 				let room = state.map.get(ply_loc).unwrap();
 
-				match command[1..] {
+				let command: Vec<&str> = command.iter().map(String::as_ref).collect();
+
+				match &command[..] {
 					["state"] => println!("{:#?}", state),
 					["ply"] => {
 						println!("{:#?}", state.player);
@@ -172,13 +191,17 @@ pub async fn run_main_controller() {
 						let loc = get_coordinator().hack_game_mut().player.location;
 						get_coordinator().hack_game_mut().spawn_enemy_at(loc, random());
 
-						run_battle_controller().await
+						task::enter_mode(task::ControllerMode::Battle).await;
+						run_battle_controller().await;
+						task::leave_mode().await;
 					}
 
 					["merchant"] => {
 						drop(state);
 
-						run_merchant_controller().await
+						task::enter_mode(task::ControllerMode::Merchant).await;
+						run_merchant_controller().await;
+						task::leave_mode().await;
 					}
 
 					_ => {
@@ -189,16 +212,14 @@ pub async fn run_main_controller() {
 				continue
 			}
 
-			match command[0] {
-				"n" | "north" => if try_move(Direction::North).await { break 'main_loop }
-				"e" | "east" => if try_move(Direction::East).await { break 'main_loop }
-				"s" | "south" => if try_move(Direction::South).await { break 'main_loop }
-				"w" | "west" => if try_move(Direction::West).await { break 'main_loop }
-				"m" | "map" => task::show_map(true).await,
+			match command.main().unwrap() {
+				PlayerCommand::GoNorth => if try_move(Direction::North).await { break 'main_loop }
+				PlayerCommand::GoEast => if try_move(Direction::East).await { break 'main_loop }
+				PlayerCommand::GoSouth => if try_move(Direction::South).await { break 'main_loop }
+				PlayerCommand::GoWest => if try_move(Direction::West).await { break 'main_loop }
+				PlayerCommand::ShowMap => task::show_map(true).await,
 
-				"h" | "help" => print_help(),
-
-				"heal" | "eat" => {
+				PlayerCommand::Heal => {
 					if task::consume_player_item(Item::Food).await {
 						task::heal_player(rng().gen_range(1, 4)).await;
 					} else {
@@ -206,17 +227,14 @@ pub async fn run_main_controller() {
 					}
 				}
 
-				// "r" | "restart" => Some(Event::Restart),
-				"q" | "quit" => break 'main_loop,
-				cmd => {
-					println!("what now? '{}'", cmd);
-					continue;
-				}
+				PlayerCommand::Quit => break 'main_loop,
 			}
 
 			break
 		}
 	}
+
+	task::leave_mode().await;
 
 	println!("[main] leave");
 }

@@ -11,29 +11,63 @@ use crate::prelude::*;
 use crate::view::ViewCommand;
 use crate::game_state::GameCommand;
 
-// pub enum ControllerMode {
-// 	Battle, Merchant
-// }
+#[derive(Copy, Clone, Debug)]
+pub enum ControllerMode {
+	Main, Battle, Merchant
+}
 
-// pub enum ControllerModeChange {
-// 	Enter(ControllerMode),
-// 	Leave(ControllerMode),
-// }
+use crate::controller::{main, battle, merchant};
 
 #[derive(Debug)]
-pub struct PlayerCommand(pub String);
+pub enum PlayerCommand {
+	Main(main::PlayerCommand),
+	Battle(battle::PlayerCommand),
+	Merchant(merchant::PlayerCommand),
+	Debug(Vec<String>),
+}
 
-// pub async fn enter_mode(mode: ControllerMode) {
-// 	get_coordinator()
-// 		.schedule_mode_change(ControllerModeChange::Enter(mode))
-// 		.await
-// }
+impl PlayerCommand {
+	pub fn main(&self) -> Option<&main::PlayerCommand> {
+		match self {
+			PlayerCommand::Main(cmd) => Some(cmd),
+			_ => None,
+		}
+	}
 
-// pub async fn leave_mode(mode: ControllerMode) {
-// 	get_coordinator()
-// 		.schedule_mode_change(ControllerModeChange::Leave(mode))
-// 		.await
-// }
+	pub fn battle(&self) -> Option<&battle::PlayerCommand> {
+		match self {
+			PlayerCommand::Battle(cmd) => Some(cmd),
+			_ => None,
+		}
+	}
+
+	pub fn merchant(&self) -> Option<&merchant::PlayerCommand> {
+		match self {
+			PlayerCommand::Merchant(cmd) => Some(cmd),
+			_ => None,
+		}
+	}
+
+	pub fn debug(&self) -> Option<&[String]> {
+		match self {
+			PlayerCommand::Debug(cmd) => Some(cmd),
+			_ => None,
+		}
+	}
+}
+
+pub async fn enter_mode(mode: ControllerMode) {
+	get_coordinator()
+		.schedule_view_command(ViewCommand::PushControllerMode(mode))
+		.await
+}
+
+pub async fn leave_mode() {
+	get_coordinator()
+		.schedule_view_command(ViewCommand::PopControllerMode)
+		.await
+}
+
 
 pub async fn get_player_command() -> PlayerCommand {
 	get_coordinator()
@@ -52,7 +86,11 @@ use crate::game_state::{Item, HealthModifyReason};
 // TODO: consume/interact_room_encounter/item?
 
 pub async fn give_player_item(item: Item) {
-	let command = GameCommand::GivePlayerItem(item, 1);
+	give_player_item_n(item, 1).await
+}
+
+pub async fn give_player_item_n(item: Item, n: usize) {
+	let command = GameCommand::GivePlayerItem(item, n);
 	get_coordinator().schedule_model_command::<()>(command).await;
 	get_coordinator().schedule_view_command(ViewCommand::GameCommand(command)).await
 }

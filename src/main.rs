@@ -17,14 +17,16 @@ mod enemy;
 
 use prelude::*;
 use game_state::GameState;
+use view::{View, TextView};
+use task::Coordinator;
 
 fn main() {
 	let mut executor = task::Executor::new();
 
 	let game_state = generate_game_state();
 	let game_state = Rc::new(RefCell::new(game_state));
-	let mut view = view::View::new();
-	let mut coordinator = task::Coordinator::new(Rc::clone(&game_state));
+	let mut view = TextView::new();
+	let mut coordinator = Coordinator::new(Rc::clone(&game_state));
 
 	unsafe {
 		COORDINATOR = Some(RefCell::new(coordinator.clone()));
@@ -39,9 +41,9 @@ fn main() {
 	}
 }
 
-static mut COORDINATOR: Option<RefCell<task::Coordinator>> = None;
+static mut COORDINATOR: Option<RefCell<Coordinator>> = None;
 
-pub fn get_coordinator() -> std::cell::Ref<'static, task::Coordinator> {
+pub fn get_coordinator() -> std::cell::Ref<'static, Coordinator> {
 	unsafe {
 		COORDINATOR.as_ref()
 			.expect("Coordinator not initialised!")

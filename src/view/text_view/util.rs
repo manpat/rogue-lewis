@@ -1,4 +1,4 @@
-use crate::view::render_buffer::*;
+use super::render_buffer::*;
 
 use crate::prelude::*;
 use crate::game_state::GameState;

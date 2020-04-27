@@ -81,6 +81,12 @@ pub async fn show_map(whole_map: bool) {
 		.await
 }
 
+pub async fn show_inventory() {
+	get_coordinator()
+		.schedule_view_command(ViewCommand::ShowInventory)
+		.await
+}
+
 use crate::game_state::HealthModifyReason;
 use crate::item::Item;
 

@@ -15,6 +15,7 @@ pub enum PlayerCommand {
 	Heal,
 
 	ShowMap,
+	ShowInventory,
 	Quit,
 }
 
@@ -223,6 +224,7 @@ pub async fn run_main_controller() {
 				PlayerCommand::GoSouth => if try_move(Direction::South).await { break 'main_loop }
 				PlayerCommand::GoWest => if try_move(Direction::West).await { break 'main_loop }
 				PlayerCommand::ShowMap => task::show_map(true).await,
+				PlayerCommand::ShowInventory => task::show_inventory().await,
 
 				PlayerCommand::Heal => {
 					if task::consume_player_item(Item::Food).await {

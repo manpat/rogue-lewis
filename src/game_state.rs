@@ -223,6 +223,10 @@ impl Inventory {
 
 	pub fn has(&self, item: Item) -> bool { self.count(item) > 0 }
 
+	pub fn iter_items(&self) -> impl Iterator<Item=Item> + '_ {
+		self.items.iter().cloned()
+	}
+
 	pub fn iter_equipment(&self) -> impl Iterator<Item=Equipment> + '_ {
 		self.items.iter()
 			.filter_map(|i| match i {

@@ -31,7 +31,7 @@ impl Coordinator {
 	pub fn hack_game(&self) -> std::cell::Ref<GameState> { self.hack_game_state.borrow() }
 	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.hack_game_state.borrow_mut() }
 
-	pub fn run(&mut self, game_state: &mut GameState, view: &mut View) {
+	pub fn run(&mut self, game_state: &mut GameState, view: &mut impl View) {
 		for (event, promise) in self.inner.borrow_mut().unscheduled_model_promises.drain(..) {
 			game_state.submit_command(event, promise);
 		}

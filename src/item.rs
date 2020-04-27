@@ -2,7 +2,7 @@ use crate::prelude::*;
 use rand::distributions::{Standard, Distribution};
 
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Item {
 	Food,
 	Treasure,
@@ -13,7 +13,7 @@ pub enum Item {
 	Equipment(Equipment),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Equipment {
 	Sword,
 	Shield,

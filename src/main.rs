@@ -33,7 +33,6 @@ fn main() {
 	}
 
 	executor.queue(controller::run_main_controller());
-	executor.poll();
 
 	while executor.num_queued_tasks() > 0 && !view.should_quit() {
 		// TODO: update gamestate and resume until a view event is being waited for

@@ -1,9 +1,15 @@
 mod window;
+mod gfx;
+mod vertex;
+
+mod map_view;
 
 use crate::prelude::*;
 use crate::game_state::{GameState, GameCommand, Inventory};
 use crate::task::{PlayerCommand, UntypedPromise, Promise, ControllerMode};
 use super::{View, ViewCommand};
+
+use gfx::Gfx;
 
 
 pub struct GfxView {
@@ -14,12 +20,28 @@ pub struct GfxView {
 	player_command_promise: Option<Promise<PlayerCommand>>,
 
 	window: window::Window,
+	gfx: Gfx,
+
 	should_quit: bool,
+
+	map_view: map_view::MapView,
 }
 
 
 impl GfxView {
 	pub fn new() -> GfxView {
+		let window = window::Window::new().expect("Failed to create window");
+		let mut gfx = Gfx::new();
+
+		let shader = gfx.new_shader(
+			include_str!("gfx_view/vert.glsl"),
+			include_str!("gfx_view/frag.glsl"),
+			&["a_vertex", "a_color"]
+		);
+		gfx.use_shader(shader);
+
+		let map_view = map_view::MapView::new(&mut gfx);
+
 		GfxView {
 			commands: Vec::new(),
 			controller_mode_stack: Vec::new(),
@@ -27,10 +49,12 @@ impl GfxView {
 			player_commands: Vec::new(),
 			player_command_promise: None,
 
-			window: window::Window::new()
-				.expect("Failed to create window"),
+			window,
+			gfx,
 
 			should_quit: false,
+
+			map_view,
 		}
 	}
 
@@ -176,10 +200,10 @@ impl View for GfxView {
 			}
 		}
 
-		unsafe {
-			gl::ClearColor(0.1, 0.1, 0.1, 1.0);
-			gl::Clear(gl::COLOR_BUFFER_BIT);
-		}
+		self.gfx.set_bg_color(Color::grey(0.1));
+		self.gfx.clear();
+
+		self.map_view.render(&mut self.gfx, game_state);
 
 		self.window.swap();
 	}

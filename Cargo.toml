@@ -10,3 +10,5 @@ rand = "0.7"
 
 gl = "0.14.0"
 sdl2 = "0.33.0"
+
+common = { git="https://github.com/manpat/common-rs.git" }

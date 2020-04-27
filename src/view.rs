@@ -91,10 +91,9 @@ impl View {
 							Ordering::Less => match reason {
 								HealthModifyReason::Attack => {
 									println!("You lost {} health!", -n);
-								}
-
-								HealthModifyReason::Hunger => {
-									println!("Your hunger cost you {} health.", -n);
+									if game_state.player.is_dead() {
+										println!("Unfortunately, the strike is fatal");
+									}
 								}
 
 								_ => {}
@@ -227,12 +226,13 @@ fn parse_battle_player_command(cmd: &str) -> Option<PlayerCommand> {
 
 fn parse_merchant_player_command(cmd: &str) -> Option<PlayerCommand> {
 	use crate::controller::merchant::PlayerCommand::*;
-	use crate::item::{Item, Equipment};
+	use crate::item::Item;
 
 	let cmd = match cmd {
 		"b food" => BuyItem(Item::Food),
 		"b map" => BuyItem(Item::Map),
 		"b key" => BuyItem(Item::Key),
+		"b equipment" => BuyItem(Item::Equipment(random())),
 
 		"s food" => SellItem(Item::Food),
 		"s map" => SellItem(Item::Map),

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::controller::*;
-use crate::game_state::HealthModifyReason;
 use crate::item::*;
 use crate::room::EncounterType;
 use crate::task;
@@ -28,7 +27,7 @@ async fn try_move(dir: Direction) -> bool {
 	}
 
 	if !task::consume_player_item(Item::Food).await {
-		if !task::damage_player(1, HealthModifyReason::Hunger).await {
+		if !task::starve_player().await {
 			println!("You starve to death");
 			return true
 		} else {
@@ -36,7 +35,7 @@ async fn try_move(dir: Direction) -> bool {
 				get_coordinator().hack_game_mut().player.hunger);
 		}
 	} else {
-		get_coordinator().hack_game_mut().player.hunger = 10;
+		task::sate_player().await;
 	}
 
 	let player_pos = get_coordinator().hack_game_mut().player.location;

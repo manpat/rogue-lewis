@@ -11,7 +11,6 @@ use std::collections::HashMap;
 pub enum HealthModifyReason {
 	Heal,
 	Attack,
-	Hunger,
 }
 
 
@@ -20,7 +19,11 @@ pub enum GameCommand {
 	GivePlayerItem(Item, usize),
 	ConsumePlayerItem(Item, usize),
 	ModifyPlayerHealth(i32, HealthModifyReason),
+	StarvePlayer,
+	SatePlayer,
 	MovePlayer(Direction),
+
+	AttackEnemy(i32),
 }
 
 
@@ -94,8 +97,28 @@ impl GameState {
 				promise.bool().fulfill(self.player.health > 0);
 			}
 
+			GameCommand::StarvePlayer => {
+				self.player.hunger -= 1;
+				promise.bool().fulfill(self.player.hunger > 0);
+			}
+
+			GameCommand::SatePlayer => {
+				self.player.hunger = 10;
+				promise.void().fulfill(());
+			}
+
 			GameCommand::MovePlayer(dir) => {
 				promise.bool().fulfill(self.try_move_player(dir));
+			}
+
+			GameCommand::AttackEnemy(dmg) => {
+				let loc = self.player.location;
+				if let Some(mut enemy) = self.get_enemy(loc) {
+					enemy.health -= dmg;
+					self.update_enemy(loc, enemy);
+				}
+
+				promise.void().fulfill(());
 			}
 		}
 	}

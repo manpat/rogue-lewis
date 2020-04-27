@@ -1,6 +1,6 @@
 // use crate::prelude::*;
 use crate::task;
-use crate::item::{Item, Equipment};
+use crate::item::Item;
 
 
 #[derive(Debug)]

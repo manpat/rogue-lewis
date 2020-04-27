@@ -41,6 +41,10 @@ impl Coordinator {
 		}
 	}
 
+	pub fn view_events_in_flight(&self) -> bool {
+		!self.inner.borrow().unscheduled_view_promises.is_empty()
+	}
+
 	pub(super) fn schedule_view_command<O>(&self, cmd: ViewCommand) -> impl Future<Output=O>
 		where O: Promisable, Promise<O>: Into<UntypedPromise>
 	{

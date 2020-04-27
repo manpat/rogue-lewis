@@ -34,6 +34,10 @@ impl Executor {
 		self.tasks.len()
 	}
 
+	pub fn has_work_pending(&self) -> bool {
+		!self.wake_queue.lock().unwrap().is_empty()
+	}
+
 	pub fn poll(&mut self) {
 		let wake_queue = std::mem::replace(&mut *self.wake_queue.lock().unwrap(), Vec::new());
 

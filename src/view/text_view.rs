@@ -127,6 +127,8 @@ impl View for TextView {
 			}
 		}
 	}
+
+	fn should_quit(&self) -> bool { false }
 }
 
 fn print_map(state: &GameState) {

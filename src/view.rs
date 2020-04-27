@@ -1,6 +1,8 @@
 pub mod text_view;
+pub mod gfx_view;
 
 pub use text_view::TextView;
+pub use gfx_view::GfxView;
 
 use crate::game_state::{GameState, GameCommand};
 use crate::task::{UntypedPromise, ControllerMode};
@@ -19,4 +21,5 @@ pub enum ViewCommand {
 pub trait View {
 	fn submit_command(&mut self, cmd: ViewCommand, promise: UntypedPromise);
 	fn update(&mut self, game_state: &GameState);
+	fn should_quit(&self) -> bool;
 }

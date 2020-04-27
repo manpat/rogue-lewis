@@ -17,7 +17,7 @@ mod enemy;
 
 use prelude::*;
 use game_state::GameState;
-use view::{View, TextView};
+use view::View;
 use task::Coordinator;
 
 fn main() {
@@ -25,7 +25,7 @@ fn main() {
 
 	let game_state = generate_game_state();
 	let game_state = Rc::new(RefCell::new(game_state));
-	let mut view = TextView::new();
+	let mut view = view::GfxView::new();
 	let mut coordinator = Coordinator::new(Rc::clone(&game_state));
 
 	unsafe {
@@ -33,10 +33,14 @@ fn main() {
 	}
 
 	executor.queue(controller::run_main_controller());
+	executor.poll();
 
-	while executor.num_queued_tasks() > 0 {
+	while executor.num_queued_tasks() > 0 && !view.should_quit() {
+		// TODO: update gamestate and resume until a view event is being waited for
 		executor.poll();
 		coordinator.run(&mut game_state.borrow_mut(), &mut view);
+
+		// TODO: update view until executor has things to wake
 		view.update(&game_state.borrow());
 	}
 }

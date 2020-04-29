@@ -28,12 +28,20 @@ impl Gfx {
 		}
 	}
 
+	pub fn set_viewport(&mut self, size: Vec2i) {
+		unsafe {
+			let Vec2i{x, y} = size;
+			gl::Viewport(0, 0, x, y);
+		}
+	}
+
 	pub fn clear(&mut self) {
 		unsafe {
 			gl::Clear(gl::COLOR_BUFFER_BIT|gl::DEPTH_BUFFER_BIT|gl::STENCIL_BUFFER_BIT);
 		}
 	}
 
+	// Shaders
 	pub fn new_shader(&mut self, vsrc: &str, fsrc: &str, attribs: &[&str]) -> ShaderID {
 		self.shaders.push(Shader::new(vsrc, fsrc, attribs));
 		ShaderID(self.shaders.len()-1)
@@ -56,6 +64,18 @@ impl Gfx {
 		}
 	}
 
+	pub fn set_uniform_mat4(&mut self, name: &str, value: &Mat4) {
+		unsafe {
+			let shader_id = self.bound_shader.unwrap();
+			let shader = &self.shaders[shader_id.0];
+			let name = std::ffi::CString::new(name.as_bytes()).unwrap();
+
+			let loc = gl::GetUniformLocation(shader.handle, name.as_ptr());
+			gl::UniformMatrix4fv(loc, 1, 0, &value.transpose() as *const _ as *const f32);
+		}
+	}
+
+	// Meshes
 	pub fn new_mesh(&mut self, descriptor: Descriptor) -> MeshID {
 		self.meshes.push(Mesh::new(descriptor));
 		MeshID(self.meshes.len()-1)

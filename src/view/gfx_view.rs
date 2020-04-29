@@ -23,6 +23,11 @@ pub struct GfxView {
 	gfx: Gfx,
 
 	should_quit: bool,
+	mouse_pos: Vec2,
+
+	timer: f64,
+	camera_target: Vec3,
+	camera_pos: Vec3,
 
 	map_view: map_view::MapView,
 }
@@ -53,6 +58,11 @@ impl GfxView {
 			gfx,
 
 			should_quit: false,
+			mouse_pos: Vec2::zero(),
+
+			timer: 0.0,
+			camera_target: Vec3::zero(),
+			camera_pos: Vec3::zero(),
 
 			map_view,
 		}
@@ -64,26 +74,46 @@ impl GfxView {
 			.expect("Empty controller stack!")
 	}
 
+	fn process_click(&mut self, pos: Vec2) {
+		let window_half = self.window.size().to_vec2() / 2.0;
+		let diff = (pos - window_half) / window_half * Vec2::new(1.0, -1.0);
+
+		use crate::controller::main::PlayerCommand::*;
+
+		if diff.y > 0.6 {
+			self.push_player_command(PlayerCommand::Main(GoNorth));
+		} else if diff.y < -0.6 {
+			self.push_player_command(PlayerCommand::Main(GoSouth));
+		}
+
+		if diff.x > 0.6 {
+			self.push_player_command(PlayerCommand::Main(GoEast));
+		} else if diff.x < -0.6 {
+			self.push_player_command(PlayerCommand::Main(GoWest));
+		}
+	}
+
 	fn process_events(&mut self) {
 		use crate::controller::main::PlayerCommand::*;
-		use sdl2::keyboard::Keycode;
 
-		let mut event_pump = self.window.event_pump();
-		for event in event_pump.poll_iter() {
-			use sdl2::event::Event;
+		use glutin::{WindowEvent, ElementState::Pressed, MouseButton::Left as LeftMouse};
+		use glutin::dpi::PhysicalPosition;
 
+		let events = self.window.poll_events();
+
+		for event in events {
 			match event {
-				Event::Quit{..} => { self.should_quit = true; }
-				Event::KeyDown{ keycode: Some(keycode), ..} => match keycode {
-					Keycode::Escape => self.push_player_command(PlayerCommand::Main(Quit)),
-
-					Keycode::W => self.push_player_command(PlayerCommand::Main(GoNorth)),
-					Keycode::S => self.push_player_command(PlayerCommand::Main(GoSouth)),
-					Keycode::D => self.push_player_command(PlayerCommand::Main(GoEast)),
-					Keycode::A => self.push_player_command(PlayerCommand::Main(GoWest)),
-
-					_ => {}
+				WindowEvent::CursorMoved {position, ..} => {
+					let PhysicalPosition{x, y} = position.to_physical(self.window.dpi());
+					self.mouse_pos = Vec2::new(x as f32, y as f32);
 				}
+
+				WindowEvent::MouseInput {state: Pressed, button: LeftMouse, ..} => {
+					self.process_click(self.mouse_pos);
+				}
+
+				WindowEvent::CloseRequested => self.push_player_command(PlayerCommand::Main(Quit)),
+
 				_ => {}
 			}
 		}
@@ -176,6 +206,9 @@ impl View for GfxView {
 
 						GameCommand::MovePlayer(dir) => {
 							println!("You move {}", dir);
+							self.camera_target = game_state.player.location
+								.to_vec2i().to_vec2()
+								.to_x0z() * Vec3::new(3.0, 0.0,-3.0);
 						}
 
 						_ => {}
@@ -199,6 +232,24 @@ impl View for GfxView {
 				}
 			}
 		}
+
+		self.timer += 1.0/60.0;
+
+		self.camera_pos += (self.camera_target - self.camera_pos) / 60.0;
+
+		let window_size = self.window.size();
+		let aspect = window_size.x as f32 / window_size.y as f32;
+
+		let projection = Mat4::ortho_aspect(8.0, aspect, -100.0, 200.0);
+		let orientation = Quat::new(Vec3::from_y(1.0), PI/8.0 + self.timer.sin() as f32*0.02)
+			* Quat::new(Vec3::from_x(1.0), -PI/6.0);
+
+		let translation = Mat4::translate(-self.camera_pos + orientation.forward() * 3.0);
+
+		let proj_view = projection * orientation.conjugate().to_mat4() * translation;
+
+		self.gfx.set_uniform_mat4("u_proj_view", &proj_view);
+		self.gfx.set_viewport(window_size);
 
 		self.gfx.set_bg_color(Color::grey(0.1));
 		self.gfx.clear();

@@ -1,36 +1,30 @@
+use crate::prelude::*;
 use std::error::Error;
-use sdl2::Sdl;
-use sdl2::video::{GLContext, GLProfile};
 
 pub struct Window {
-	#[allow(dead_code)]
-	sdl: Sdl,
-
-	window: sdl2::video::Window,
-
-	#[allow(dead_code)]
-	gl_ctx: GLContext,
+	context: glutin::WindowedContext<glutin::PossiblyCurrent>,
+	events_loop: glutin::EventsLoop,
 }
 
 
 impl Window {
 	pub fn new() -> Result<Self, Box<dyn Error>> {
-		let sdl = sdl2::init()?;
-		let video = sdl.video()?;
+		let events_loop = glutin::EventsLoop::new();
 
-		let attr = video.gl_attr();
-		attr.set_context_profile(GLProfile::Core);
-		attr.set_context_version(3, 2);
-		attr.set_context_flags().debug().set();
+		let window = glutin::WindowBuilder::new()
+			.with_title("rogue-lewis")
+			.with_resizable(true);
 
-		let window = video
-			.window("rogue-lewis", 640, 640)
-			.opengl()
-			.build()?;
+		let context = glutin::ContextBuilder::new()
+			.with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 2)))
+			.with_gl_profile(glutin::GlProfile::Core)
+			.with_gl_debug_flag(true)
+			.build_windowed(window, &events_loop)?;
 
-		let gl_ctx = window.gl_create_context()?;
+		let context = unsafe { context.make_current().unwrap() };
 
-		gl::load_with(|s| video.gl_get_proc_address(s) as *const _);
+		gl::load_with(|s| context.get_proc_address(s) as *const _);
+
 		unsafe {
 			let mut vao = 0;
 			gl::GenVertexArrays(1, &mut vao);
@@ -60,21 +54,40 @@ impl Window {
 			);
 		}
 
-		println!("{:?}", video.gl_attr().context_version());
-
 		Ok(Window {
-			sdl,
-			window,
-			gl_ctx,
+			context,
+			events_loop,
 		})
 	}
 
-	pub fn event_pump(&mut self) -> sdl2::EventPump {
-		self.sdl.event_pump().unwrap()
+	pub fn size(&self) -> Vec2i {
+		let (x, y): (u32, u32) = self.context.window()
+			.get_inner_size()
+			.unwrap()
+			.to_physical(self.dpi())
+			.into();
+
+		Vec2i::new(x as i32, y as i32)
+	}
+
+	pub fn dpi(&self) -> f64 {
+		self.context.window().get_hidpi_factor()
+	} 
+
+	pub fn poll_events(&mut self) -> Vec<glutin::WindowEvent> {
+		let mut events = Vec::new();
+
+		self.events_loop.poll_events(|event| {
+			if let glutin::Event::WindowEvent{event, ..} = event {
+				events.push(event);
+			}
+		});
+
+		events
 	}
 
 	pub fn swap(&mut self) {
-		self.window.gl_swap_window();
+		self.context.swap_buffers().unwrap();
 	}
 }
 

@@ -21,6 +21,7 @@ impl MapView {
 
 	pub fn render(&mut self, gfx: &mut gfx::Gfx, game_state: &GameState) {
 		self.mb.clear();
+
 		build_map(&mut self.mb, game_state);
 
 		gfx.update_mesh(self.mesh, &self.mb.vs, &self.mb.es);
@@ -34,10 +35,10 @@ fn build_square(mb: &mut ColorMeshBuilder, pos: Vec2, size: f32, color: Color) {
 	let size = size/2.0;
 
 	let vs = [
-		ColorVertex::new((Vec2::new(-size,-size) + pos).extend(0.0), color),
-		ColorVertex::new((Vec2::new(-size, size) + pos).extend(0.0), color),
-		ColorVertex::new((Vec2::new( size, size) + pos).extend(0.0), color),
-		ColorVertex::new((Vec2::new( size,-size) + pos).extend(0.0), color),
+		ColorVertex::new((Vec2::new(-size,-size) + pos).to_x0z(), color),
+		ColorVertex::new((Vec2::new(-size, size) + pos).to_x0z(), color),
+		ColorVertex::new((Vec2::new( size, size) + pos).to_x0z(), color),
+		ColorVertex::new((Vec2::new( size,-size) + pos).to_x0z(), color),
 	];
 
 	mb.add_quad(&vs);
@@ -45,21 +46,23 @@ fn build_square(mb: &mut ColorMeshBuilder, pos: Vec2, size: f32, color: Color) {
 
 fn build_map(mb: &mut ColorMeshBuilder, game_state: &GameState) {
 	let location_to_vec = |Location(x, y): Location| -> Vec2 {
-		Vec2i::new(x, y).to_vec2()*0.2
+		Vec2i::new(x, -y).to_vec2()*3.1
 	};
 
 	let room_color = Color::grey(0.2);
 	let visited_room_color = Color::grey(0.4);
 	let player_color = Color::rgb(0.5, 0.2, 0.2);
 
+	build_square(mb, Vec2::zero(), 3.1, Color::white());
+
 	for (location, _) in game_state.map.iter() {
 		let visited = game_state.map.visited(location);
 		let color = if visited { visited_room_color } else { room_color };
 
-		build_square(mb, location_to_vec(location), 0.05, color);
+		build_square(mb, location_to_vec(location), 3.0, color);
 	}
 
-	build_square(mb, location_to_vec(game_state.player.location), 0.07, player_color);
+	build_square(mb, location_to_vec(game_state.player.location), 0.8, player_color);
 }
 
 

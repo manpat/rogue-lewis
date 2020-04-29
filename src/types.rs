@@ -22,6 +22,10 @@ impl Location {
 		self.offset(ox, oy)
 	}
 
+	pub fn to_vec2i(self) -> Vec2i {
+		Vec2i::new(self.0, self.1)
+	}
+
 	/// Manhattan distance
 	pub fn distance(self, Location(ox, oy): Location) -> i32 {
 		let Location(sx, sy) = self;

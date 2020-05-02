@@ -2,7 +2,7 @@ use crate::prelude::*;
 use super::gfx;
 use super::vertex::{ColorVertex, Vertex};
 
-use crate::game_state::GameState;
+use crate::gamestate::GameState;
 
 type ColorMeshBuilder = MeshBuilder<ColorVertex>;
 
@@ -19,10 +19,10 @@ impl MapView {
 		}
 	}
 
-	pub fn render(&mut self, gfx: &mut gfx::Gfx, game_state: &GameState) {
+	pub fn render(&mut self, gfx: &mut gfx::Gfx, gamestate: &GameState) {
 		self.mb.clear();
 
-		build_map(&mut self.mb, game_state);
+		build_map(&mut self.mb, gamestate);
 
 		gfx.update_mesh(self.mesh, &self.mb.vs, &self.mb.es);
 		gfx.draw_mesh(self.mesh);
@@ -44,7 +44,7 @@ fn build_square(mb: &mut ColorMeshBuilder, pos: Vec2, size: f32, color: Color) {
 	mb.add_quad(&vs);
 }
 
-fn build_map(mb: &mut ColorMeshBuilder, game_state: &GameState) {
+fn build_map(mb: &mut ColorMeshBuilder, gamestate: &GameState) {
 	let location_to_vec = |Location(x, y): Location| -> Vec2 {
 		Vec2i::new(x, -y).to_vec2()*3.1
 	};
@@ -55,14 +55,14 @@ fn build_map(mb: &mut ColorMeshBuilder, game_state: &GameState) {
 
 	build_square(mb, Vec2::zero(), 3.1, Color::white());
 
-	for (location, _) in game_state.map.iter() {
-		let visited = game_state.map.visited(location);
+	for (location, _) in gamestate.map.iter() {
+		let visited = gamestate.map.visited(location);
 		let color = if visited { visited_room_color } else { room_color };
 
 		build_square(mb, location_to_vec(location), 3.0, color);
 	}
 
-	build_square(mb, location_to_vec(game_state.player.location), 0.8, player_color);
+	build_square(mb, location_to_vec(gamestate.player.location), 0.8, player_color);
 }
 
 

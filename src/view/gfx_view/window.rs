@@ -92,8 +92,8 @@ impl Window {
 }
 
 
-extern "system" fn gl_message_callback(source: u32, ty: u32, id: u32, severity: u32,
-	length: i32, msg: *const i8, ud: *mut std::ffi::c_void)
+extern "system" fn gl_message_callback(source: u32, ty: u32, _id: u32, severity: u32,
+	_length: i32, msg: *const i8, _ud: *mut std::ffi::c_void)
 {
 	let severity = match severity {
 		gl::DEBUG_SEVERITY_LOW => "low",

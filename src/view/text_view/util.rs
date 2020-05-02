@@ -1,7 +1,7 @@
 use super::render_buffer::*;
 
 use crate::prelude::*;
-use crate::game_state::GameState;
+use crate::gamestate::GameState;
 use crate::item::Item;
 use crate::room::{Room, EncounterType};
 

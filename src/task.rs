@@ -9,7 +9,7 @@ pub use coordinator::Coordinator;
 use crate::prelude::*;
 
 use crate::view::ViewCommand;
-use crate::game_state::GameCommand;
+use crate::gamestate::GameCommand;
 
 #[derive(Copy, Clone, Debug)]
 pub enum ControllerMode {
@@ -87,7 +87,7 @@ pub async fn show_inventory() {
 		.await
 }
 
-use crate::game_state::HealthModifyReason;
+use crate::gamestate::HealthModifyReason;
 use crate::item::Item;
 
 // TODO: consume/interact_room_encounter/item?

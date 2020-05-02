@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::game_state::{GameState, GameCommand};
+use crate::gamestate::{GameState, GameCommand};
 use crate::view::{View, ViewCommand};
 use crate::task::promise::*;
 
@@ -12,11 +12,11 @@ pub(super) struct Inner {
 #[derive(Clone)]
 pub struct Coordinator {
 	inner: Rc<RefCell<Inner>>,
-	hack_game_state: GameStateHandle,
+	hack_gamestate: GameStateHandle,
 }
 
 impl Coordinator {
-	pub fn new(hack_game_state: GameStateHandle) -> Coordinator {
+	pub fn new(hack_gamestate: GameStateHandle) -> Coordinator {
 		let inner = Inner {
 			unscheduled_model_promises: Vec::new(),
 			unscheduled_view_promises: Vec::new(),
@@ -24,16 +24,16 @@ impl Coordinator {
 
 		Coordinator {
 			inner: Rc::new(RefCell::new(inner)),
-			hack_game_state
+			hack_gamestate
 		}
 	}
 
-	pub fn hack_game(&self) -> std::cell::Ref<GameState> { self.hack_game_state.borrow() }
-	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.hack_game_state.borrow_mut() }
+	pub fn hack_game(&self) -> std::cell::Ref<GameState> { self.hack_gamestate.borrow() }
+	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.hack_gamestate.borrow_mut() }
 
-	pub fn run(&mut self, game_state: &mut GameState, view: &mut impl View) {
+	pub fn run(&mut self, gamestate: &mut GameState, view: &mut impl View) {
 		for (event, promise) in self.inner.borrow_mut().unscheduled_model_promises.drain(..) {
-			game_state.submit_command(event, promise);
+			gamestate.submit_command(event, promise);
 		}
 
 		for (event, promise) in self.inner.borrow_mut().unscheduled_view_promises.drain(..) {

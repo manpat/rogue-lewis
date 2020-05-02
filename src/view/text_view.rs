@@ -2,7 +2,7 @@ pub mod render_buffer;
 pub mod util;
 
 use crate::prelude::*;
-use crate::game_state::{GameState, GameCommand, Inventory};
+use crate::gamestate::{GameState, GameCommand, Inventory};
 use crate::task::{PlayerCommand, UntypedPromise, ControllerMode};
 use super::{View, ViewCommand};
 
@@ -33,7 +33,7 @@ impl View for TextView {
 		self.commands.push((cmd, promise));
 	}
 
-	fn update(&mut self, game_state: &GameState) {
+	fn update(&mut self, gamestate: &GameState) {
 		let commands = std::mem::replace(&mut self.commands, Vec::new());
 
 		for (cmd, promise) in commands {
@@ -45,21 +45,21 @@ impl View for TextView {
 
 				ViewCommand::ShowMap { whole_map } => {
 					if whole_map {
-						print_map(game_state);
+						print_map(gamestate);
 					} else {
-						print_local_area(game_state);
+						print_local_area(gamestate);
 					}
 
 					promise.void().fulfill(());
 				}
 
 				ViewCommand::ShowInventory => {
-					print_inventory(&game_state.player.inventory);
+					print_inventory(&gamestate.player.inventory);
 					promise.void().fulfill(());
 				}
 
 				ViewCommand::GameCommand(event) => {
-					use crate::game_state::HealthModifyReason;
+					use crate::gamestate::HealthModifyReason;
 					use crate::item::Item;
 					use std::cmp::Ordering;
 
@@ -90,7 +90,7 @@ impl View for TextView {
 							Ordering::Less => match reason {
 								HealthModifyReason::Attack => {
 									println!("You lost {} health!", -n);
-									if game_state.player.is_dead() {
+									if gamestate.player.is_dead() {
 										println!("Unfortunately, the strike is fatal");
 									}
 								}

@@ -7,7 +7,7 @@
 mod prelude;
 mod task;
 mod types;
-mod game_state;
+mod gamestate;
 mod map;
 mod item;
 mod room;
@@ -16,7 +16,7 @@ mod controller;
 mod enemy;
 
 use prelude::*;
-use game_state::GameState;
+use gamestate::GameState;
 use view::View;
 use task::Coordinator;
 
@@ -32,7 +32,7 @@ fn main() {
 fn run_with_view(mut view: impl View) {
 	let mut executor = task::Executor::new();
 
-	let gamestate = generate_game_state();
+	let gamestate = generate_gamestate();
 	let gamestate = Rc::new(RefCell::new(gamestate));
 	let mut coordinator = Coordinator::new(Rc::clone(&gamestate));
 
@@ -64,7 +64,7 @@ pub fn get_coordinator() -> std::cell::Ref<'static, Coordinator> {
 }
 
 
-fn generate_game_state() -> GameState {
+fn generate_gamestate() -> GameState {
 	let mut state = GameState::new();
 
 	let mut map_builder = map::MapBuilder::new(&mut state.map);

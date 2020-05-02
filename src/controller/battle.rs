@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::game_state::*;
+use crate::gamestate::*;
 use crate::enemy::*;
 use crate::item::*;
 use crate::task;

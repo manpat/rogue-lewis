@@ -25,4 +25,4 @@ pub fn choose_with_weights<T: Copy>(values: &[T], weights: &[i32]) -> T {
 	values[dist.sample(&mut rng())]
 }
 
-pub type GameStateHandle = Rc<RefCell<crate::game_state::GameState>>;
+pub type GameStateHandle = Rc<RefCell<crate::gamestate::GameState>>;

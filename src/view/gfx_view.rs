@@ -5,7 +5,7 @@ mod vertex;
 mod map_view;
 
 use crate::prelude::*;
-use crate::game_state::{GameState, GameCommand, Inventory};
+use crate::gamestate::{GameState, GameCommand, Inventory};
 use crate::task::{PlayerCommand, UntypedPromise, Promise, ControllerMode};
 use super::{View, ViewCommand};
 
@@ -133,7 +133,7 @@ impl View for GfxView {
 		self.commands.push((cmd, promise));
 	}
 
-	fn update(&mut self, game_state: &GameState) {
+	fn update(&mut self, gamestate: &GameState) {
 		self.process_events();
 
 		let commands = std::mem::replace(&mut self.commands, Vec::new());
@@ -153,7 +153,7 @@ impl View for GfxView {
 				}
 
 				ViewCommand::ShowMap { .. /*whole_map*/ } => {
-					print_map(game_state);
+					print_map(gamestate);
 					promise.void().fulfill(());
 				}
 
@@ -162,7 +162,7 @@ impl View for GfxView {
 				}
 
 				ViewCommand::GameCommand(event) => {
-					use crate::game_state::HealthModifyReason;
+					use crate::gamestate::HealthModifyReason;
 					use crate::item::Item;
 					use std::cmp::Ordering;
 
@@ -193,7 +193,7 @@ impl View for GfxView {
 							Ordering::Less => match reason {
 								HealthModifyReason::Attack => {
 									println!("You lost {} health!", -n);
-									if game_state.player.is_dead() {
+									if gamestate.player.is_dead() {
 										println!("Unfortunately, the strike is fatal");
 									}
 								}
@@ -206,7 +206,7 @@ impl View for GfxView {
 
 						GameCommand::MovePlayer(dir) => {
 							println!("You move {}", dir);
-							self.camera_target = game_state.player.location
+							self.camera_target = gamestate.player.location
 								.to_vec2i().to_vec2()
 								.to_x0z() * Vec3::new(3.0, 0.0,-3.0);
 						}
@@ -254,7 +254,7 @@ impl View for GfxView {
 		self.gfx.set_bg_color(Color::grey(0.1));
 		self.gfx.clear();
 
-		self.map_view.render(&mut self.gfx, game_state);
+		self.map_view.render(&mut self.gfx, gamestate);
 
 		self.window.swap();
 	}

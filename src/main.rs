@@ -21,12 +21,20 @@ use view::View;
 use task::Coordinator;
 
 fn main() {
+	if std::env::args().find(|s| s == "--text").is_some() {
+		run_with_view(view::TextView::new());
+	} else {
+		run_with_view(view::GfxView::new());
+	}
+}
+
+
+fn run_with_view(mut view: impl View) {
 	let mut executor = task::Executor::new();
 
-	let game_state = generate_game_state();
-	let game_state = Rc::new(RefCell::new(game_state));
-	let mut view = view::GfxView::new();
-	let mut coordinator = Coordinator::new(Rc::clone(&game_state));
+	let gamestate = generate_game_state();
+	let gamestate = Rc::new(RefCell::new(gamestate));
+	let mut coordinator = Coordinator::new(Rc::clone(&gamestate));
 
 	unsafe {
 		COORDINATOR = Some(RefCell::new(coordinator.clone()));
@@ -37,12 +45,13 @@ fn main() {
 	while executor.num_queued_tasks() > 0 && !view.should_quit() {
 		// TODO: update gamestate and resume until a view event is being waited for
 		executor.poll();
-		coordinator.run(&mut game_state.borrow_mut(), &mut view);
+		coordinator.run(&mut gamestate.borrow_mut(), &mut view);
 
 		// TODO: update view until executor has things to wake
-		view.update(&game_state.borrow());
+		view.update(&gamestate.borrow());
 	}
 }
+
 
 static mut COORDINATOR: Option<RefCell<Coordinator>> = None;
 

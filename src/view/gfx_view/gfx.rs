@@ -1,12 +1,14 @@
 use crate::prelude::*;
 use super::vertex::*;
+use super::mesh_builder::MeshBuilder;
+use std::marker::PhantomData;
 
 pub struct Gfx {
 	shaders: Vec<Shader>,
 	meshes: Vec<Mesh>,
 
 	bound_shader: Option<ShaderID>,
-	bound_mesh: Option<MeshID>,
+	bound_mesh: Option<UntypedMeshID>,
 }
 
 
@@ -76,25 +78,27 @@ impl Gfx {
 	}
 
 	// Meshes
-	pub fn new_mesh(&mut self, descriptor: Descriptor) -> MeshID {
-		self.meshes.push(Mesh::new(descriptor));
-		MeshID(self.meshes.len()-1)
+	pub fn new_mesh<V: Vertex>(&mut self) -> MeshID<V> {
+		self.meshes.push(Mesh::new(V::descriptor()));
+		MeshID(self.meshes.len()-1, PhantomData)
 	}
 
-	fn bind_mesh(&mut self, id: MeshID) {
-		if self.bound_mesh == Some(id) {
+	fn bind_mesh<V: Vertex>(&mut self, id: MeshID<V>) {
+		let untyped_id = UntypedMeshID::from(id);
+		if self.bound_mesh == Some(untyped_id) {
 			return;
 		}
 
 		let mesh = self.meshes.get(id.0).expect("Tried to bind invalid mesh");
 		mesh.bind();
-		self.bound_mesh = Some(id);
+		self.bound_mesh = Some(untyped_id);
 	}
 
-	pub fn update_mesh<V: Vertex>(&mut self, id: MeshID, vs: &[V], es: &[u16]) {
+	pub fn update_mesh<V: Vertex>(&mut self, id: MeshID<V>, vs: &[V], es: &[u16]) {
 		self.bind_mesh(id);
 
 		let mesh = self.meshes.get_mut(id.0).expect("Tried to bind invalid mesh");
+		mesh.element_count = es.len() as _;
 
 		unsafe {
 			gl::BufferData(
@@ -110,12 +114,14 @@ impl Gfx {
 				es.as_ptr() as *const _,
 				gl::STATIC_DRAW
 			);
-
-			mesh.element_count = es.len() as _;
 		}
 	}
 
-	pub fn draw_mesh(&mut self, id: MeshID) {
+	pub fn update_mesh_from<V: Vertex>(&mut self, mb: &MeshBuilder<V>) {
+		self.update_mesh(mb.mesh_id, &mb.vs, &mb.es);
+	}
+
+	pub fn draw_mesh<V: Vertex>(&mut self, id: MeshID<V>) {
 		self.bind_mesh(id);
 
 		let mesh = self.meshes.get(id.0).expect("Tried to bind invalid mesh");
@@ -226,7 +232,16 @@ fn link_shader(vsh: u32, fsh: u32, attribs: &[&str]) -> u32 {
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct MeshID(usize);
+pub struct MeshID<V: Vertex>(usize, PhantomData<*const V>);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+struct UntypedMeshID(usize);
+
+impl<V: Vertex> From<MeshID<V>> for UntypedMeshID {
+	fn from(MeshID(o, _): MeshID<V>) -> UntypedMeshID {
+		UntypedMeshID(o)
+	}
+}
 
 struct Mesh {
 	descriptor: Descriptor,

@@ -76,18 +76,18 @@ impl Vertex for BasicVertex {
 #[derive(Copy, Clone, Debug)]
 pub struct ColorVertex {
 	pub pos: Vec3,
-	pub color: Vec3,
+	pub color: Vec4,
 }
 
 impl ColorVertex {
-	pub fn new(pos: Vec3, color: Vec3) -> Self {
+	pub fn new(pos: Vec3, color: Vec4) -> Self {
 		ColorVertex{pos, color}
 	}
 }
 
 impl Vertex for ColorVertex {
 	fn descriptor() -> Descriptor {
-		Descriptor::from(&[3, 3])
+		Descriptor::from(&[3, 4])
 	}
 }
 

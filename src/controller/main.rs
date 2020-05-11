@@ -5,7 +5,7 @@ use crate::room::EncounterType;
 use crate::task;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum PlayerCommand {
 	GoNorth,
 	GoEast,

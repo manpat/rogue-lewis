@@ -2,8 +2,10 @@ mod window;
 mod gfx;
 mod vertex;
 mod mesh_builder;
+mod util;
 
 mod map_view;
+mod player_view;
 mod click_region_view;
 
 use crate::prelude::*;
@@ -11,7 +13,10 @@ use crate::gamestate::{GameState, GameCommand, Inventory};
 use crate::task::{PlayerCommand, UntypedPromise, Promise, ControllerMode};
 use super::{View, ViewCommand};
 
+use util::*;
+
 use map_view::MapView;
+use player_view::PlayerView;
 use click_region_view::ClickRegionView;
 
 use gfx::Gfx;
@@ -38,6 +43,7 @@ pub struct GfxView {
 	camera_forward: Vec3,
 
 	map_view: MapView,
+	player_view: PlayerView,
 	click_region_view: ClickRegionView,
 }
 
@@ -60,7 +66,10 @@ impl GfxView {
 		gfx.use_shader(shader);
 
 		let map_view = MapView::new(&mut gfx);
-		let click_region_view = ClickRegionView::new(&mut gfx);
+		let player_view = PlayerView::new(&mut gfx);
+
+		let mut click_region_view = ClickRegionView::new(&mut gfx);
+		click_region_view.gen_regions_for_room(Vec2::zero());
 
 		GfxView {
 			commands: Vec::new(),
@@ -83,6 +92,7 @@ impl GfxView {
 			camera_forward: Vec3::from_y(-1.0),
 
 			map_view,
+			player_view,
 			click_region_view,
 		}
 	}
@@ -119,20 +129,6 @@ impl GfxView {
 		if let Some(cmd) = self.click_region_view.process_click(world_pos.to_xz(), ctl_mode) {
 			self.push_player_command(cmd);
 		}
-
-		// use crate::controller::main::PlayerCommand::*;
-
-		// if diff.y > 0.6 {
-		// 	self.push_player_command(PlayerCommand::Main(GoNorth));
-		// } else if diff.y < -0.6 {
-		// 	self.push_player_command(PlayerCommand::Main(GoSouth));
-		// }
-
-		// if diff.x > 0.6 {
-		// 	self.push_player_command(PlayerCommand::Main(GoEast));
-		// } else if diff.x < -0.6 {
-		// 	self.push_player_command(PlayerCommand::Main(GoWest));
-		// }
 	}
 
 	fn process_events(&mut self) {
@@ -238,9 +234,13 @@ impl GfxView {
 
 					GameCommand::MovePlayer(dir) => {
 						println!("You move {}", dir);
-						self.camera_target = gamestate.player.location
-							.to_vec2i().to_vec2()
-							.to_x0z() * Vec3::new(3.0, 0.0,-3.0);
+						let world_loc = location_to_world(gamestate.player.location);
+
+						self.camera_target = world_loc.to_x0z();
+						self.click_region_view.gen_regions_for_room(world_loc);
+
+						self.player_view.on_player_move(gamestate.player.location, promise.void());
+						return;
 					}
 
 					_ => {}
@@ -286,7 +286,7 @@ impl View for GfxView {
 		let window_size = self.window.size();
 		let aspect = window_size.x as f32 / window_size.y as f32;
 
-		let projection = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
+		let projection = Mat4::ortho_aspect(2.0, aspect, -100.0, 200.0);
 		let orientation = Quat::new(Vec3::from_y(1.0), PI/8.0 + self.timer.sin() as f32*0.02)
 			* Quat::new(Vec3::from_x(1.0), -PI/6.0);
 
@@ -294,7 +294,7 @@ impl View for GfxView {
 		self.camera_forward = orientation.forward();
 
 		self.camera_proj_view = projection * orientation.conjugate().to_mat4() * translation;
-		let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
+		// let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
 
 		self.gfx.set_viewport(window_size);
 
@@ -304,8 +304,11 @@ impl View for GfxView {
 		self.gfx.set_uniform_mat4("u_proj_view", &self.camera_proj_view);
 		self.map_view.render(&mut self.gfx, gamestate);
 
-		// self.gfx.set_uniform_mat4("u_proj_view", &ui_proj_view);
 		self.click_region_view.render(&mut self.gfx);
+
+		self.player_view.render(&mut self.gfx, gamestate);
+
+		// self.gfx.set_uniform_mat4("u_proj_view", &ui_proj_view);
 
 		self.window.swap();
 	}

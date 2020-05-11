@@ -11,7 +11,7 @@ use crate::prelude::*;
 use crate::view::ViewCommand;
 use crate::gamestate::GameCommand;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ControllerMode {
 	Main, Battle, Merchant
 }

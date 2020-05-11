@@ -3,7 +3,7 @@ use crate::task;
 use crate::item::Item;
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum PlayerCommand {
 	BuyItem(Item),
 	SellItem(Item),

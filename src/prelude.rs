@@ -1,6 +1,7 @@
 pub use rand::{Rng, random, seq::SliceRandom, seq::IteratorRandom};
 
 pub use common::math::*;
+pub use common::easing::*;
 
 pub use std::rc::Rc;
 pub use std::cell::RefCell;

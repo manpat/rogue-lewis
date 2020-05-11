@@ -42,6 +42,8 @@ fn run_with_view(mut view: impl View) {
 
 	executor.queue(controller::run_main_controller());
 
+	view.init(&gamestate.borrow());
+
 	while executor.num_queued_tasks() > 0 && !view.should_quit() {
 		// TODO: update gamestate and resume until a view event is being waited for
 		executor.poll();

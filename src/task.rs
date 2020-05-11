@@ -56,6 +56,20 @@ impl PlayerCommand {
 	}
 }
 
+impl From<main::PlayerCommand> for PlayerCommand {
+	fn from(cmd: main::PlayerCommand) -> PlayerCommand { PlayerCommand::Main(cmd) }
+}
+
+impl From<battle::PlayerCommand> for PlayerCommand {
+	fn from(cmd: battle::PlayerCommand) -> PlayerCommand { PlayerCommand::Battle(cmd) }
+}
+
+impl From<merchant::PlayerCommand> for PlayerCommand {
+	fn from(cmd: merchant::PlayerCommand) -> PlayerCommand { PlayerCommand::Merchant(cmd) }
+}
+
+
+
 pub async fn enter_mode(mode: ControllerMode) {
 	get_coordinator()
 		.schedule_view_command(ViewCommand::PushControllerMode(mode))

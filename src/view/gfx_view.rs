@@ -3,10 +3,10 @@ mod gfx;
 mod vertex;
 mod mesh_builder;
 mod util;
+mod click_region;
 
 mod map_view;
 mod player_view;
-mod click_region_view;
 
 use crate::prelude::*;
 use crate::gamestate::{GameState, GameCommand, Inventory};
@@ -17,8 +17,8 @@ use util::*;
 
 use map_view::MapView;
 use player_view::PlayerView;
-use click_region_view::ClickRegionView;
 
+use click_region::ClickRegionEvent;
 use gfx::Gfx;
 
 
@@ -44,7 +44,6 @@ pub struct GfxView {
 
 	map_view: MapView,
 	player_view: PlayerView,
-	click_region_view: ClickRegionView,
 }
 
 
@@ -68,9 +67,6 @@ impl GfxView {
 		let map_view = MapView::new(&mut gfx);
 		let player_view = PlayerView::new(&mut gfx);
 
-		let mut click_region_view = ClickRegionView::new(&mut gfx);
-		click_region_view.gen_regions_for_room(Vec2::zero());
-
 		GfxView {
 			commands: Vec::new(),
 			controller_mode_stack: Vec::new(),
@@ -93,40 +89,39 @@ impl GfxView {
 
 			map_view,
 			player_view,
-			click_region_view,
 		}
 	}
 
 	fn current_controller_mode(&self) -> ControllerMode {
 		self.controller_mode_stack.last()
 			.cloned()
-			.expect("Empty controller stack!")
+			.unwrap_or(ControllerMode::Main)
 	}
 
 	fn process_move(&mut self, pos: Vec2) {
-		let window_half = self.window.size().to_vec2() / 2.0;
-		let screen_pos = (pos - window_half) / window_half * Vec2::new(1.0, -1.0);
+		let screen_pos = window_to_screen(self.window.size(), pos);
 
-		let screen_pos = self.camera_proj_view.inverse() * screen_pos.extend(0.0).extend(1.0);
-		let screen_pos = screen_pos.to_vec3() / screen_pos.w;
+		let near_plane_pos = self.camera_proj_view.inverse() * screen_pos.extend(0.0).extend(1.0);
+		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
 
-		let world_pos = intersect_ground(screen_pos, self.camera_forward);
+		let world_pos = intersect_ground(near_plane_pos, self.camera_forward);
+		let ui_pos = screen_pos;
 
-		self.click_region_view.process_hover(world_pos.to_xz());
+		let event = ClickRegionEvent::new_move(ui_pos, world_pos);
+		let _ = self.map_view.process_mouse_event(event);
 	}
 
 	fn process_click(&mut self, pos: Vec2) {
-		let window_half = self.window.size().to_vec2() / 2.0;
-		let screen_pos = (pos - window_half) / window_half * Vec2::new(1.0, -1.0);
+		let screen_pos = window_to_screen(self.window.size(), pos);
 
-		let screen_pos = self.camera_proj_view.inverse() * screen_pos.extend(0.0).extend(1.0);
-		let screen_pos = screen_pos.to_vec3() / screen_pos.w;
+		let near_plane_pos = self.camera_proj_view.inverse() * screen_pos.extend(0.0).extend(1.0);
+		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
 
-		let world_pos = intersect_ground(screen_pos, self.camera_forward);
+		let world_pos = intersect_ground(near_plane_pos, self.camera_forward);
+		let ui_pos = screen_pos;
 
-		let ctl_mode = self.current_controller_mode();
-
-		if let Some(cmd) = self.click_region_view.process_click(world_pos.to_xz(), ctl_mode) {
+		let event = ClickRegionEvent::new_click(ui_pos, world_pos);
+		if let Some(cmd) = self.map_view.process_mouse_event(event) {
 			self.push_player_command(cmd);
 		}
 	}
@@ -237,8 +232,8 @@ impl GfxView {
 						let world_loc = location_to_world(gamestate.player.location);
 
 						self.camera_target = world_loc.to_x0z();
-						self.click_region_view.gen_regions_for_room(world_loc);
 
+						self.map_view.on_player_move(gamestate);
 						self.player_view.on_player_move(gamestate.player.location, promise.void());
 						return;
 					}
@@ -271,6 +266,10 @@ impl View for GfxView {
 		self.commands.push((cmd, promise));
 	}
 
+	fn init(&mut self, gamestate: &GameState) {
+		self.map_view.init(gamestate);
+	}
+
 	fn update(&mut self, gamestate: &GameState) {
 		self.process_events();
 
@@ -281,12 +280,13 @@ impl View for GfxView {
 
 		self.timer += 1.0/60.0;
 
+		// TODO: refactor all of this into a Camera type
 		self.camera_pos += (self.camera_target - self.camera_pos) / 60.0;
 
 		let window_size = self.window.size();
 		let aspect = window_size.x as f32 / window_size.y as f32;
 
-		let projection = Mat4::ortho_aspect(2.0, aspect, -100.0, 200.0);
+		let projection = Mat4::ortho_aspect(1.2, aspect, -100.0, 200.0);
 		let orientation = Quat::new(Vec3::from_y(1.0), PI/8.0 + self.timer.sin() as f32*0.02)
 			* Quat::new(Vec3::from_x(1.0), -PI/6.0);
 
@@ -303,9 +303,6 @@ impl View for GfxView {
 
 		self.gfx.set_uniform_mat4("u_proj_view", &self.camera_proj_view);
 		self.map_view.render(&mut self.gfx, gamestate);
-
-		self.click_region_view.render(&mut self.gfx);
-
 		self.player_view.render(&mut self.gfx, gamestate);
 
 		// self.gfx.set_uniform_mat4("u_proj_view", &ui_proj_view);
@@ -325,23 +322,7 @@ fn print_map(state: &GameState) {
 
 
 
-
-fn intersect_plane(plane_point: Vec3, plane_normal: Vec3, line_point: Vec3, line_direction: Vec3) -> Option<Vec3> {
-	let line_direction = line_direction.normalize();
-
-	if plane_normal.dot(line_direction).abs() < 0.01 {
-		return None;
-	}
-
-	let t = (plane_normal.dot(plane_point) - plane_normal.dot(line_point)) / plane_normal.dot(line_direction);
-	Some(line_point + line_direction * t)
-}
-
-
-fn intersect_ground(line_point: Vec3, line_direction: Vec3) -> Vec3 {
-	let plane_point = Vec3::zero();
-	let plane_normal = Vec3::from_y(1.0);
-
-	intersect_plane(plane_point, plane_normal, line_point, line_direction)
-		.expect("Camera forward perpendicular to ground plane")
+fn window_to_screen(window_size: Vec2i, pos: Vec2) -> Vec2 {
+	let window_half = window_size.to_vec2() / 2.0;
+	(pos - window_half) / window_half * Vec2::new(1.0, -1.0)
 }

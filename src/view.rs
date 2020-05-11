@@ -20,6 +20,7 @@ pub enum ViewCommand {
 
 pub trait View {
 	fn submit_command(&mut self, cmd: ViewCommand, promise: UntypedPromise);
+	fn init(&mut self, gamestate: &GameState) {}
 	fn update(&mut self, gamestate: &GameState);
 	fn should_quit(&self) -> bool;
 }

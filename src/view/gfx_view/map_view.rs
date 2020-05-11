@@ -5,7 +5,7 @@ use super::vertex::ColorVertex;
 use super::mesh_builder::MeshBuilder;
 use super::click_region::*;
 
-use crate::task::PlayerCommand;
+use crate::task::{PlayerCommand, ControllerMode};
 use crate::gamestate::GameState;
 use crate::room::Room;
 
@@ -14,6 +14,9 @@ type ColorMeshBuilder = MeshBuilder<ColorVertex>;
 pub struct MapView {
 	mb: ColorMeshBuilder,
 	door_views: [DoorView; 4],
+
+	player_move_in_progress: bool,
+	in_main_mode: bool,
 }
 
 impl MapView {
@@ -27,6 +30,9 @@ impl MapView {
 				DoorView::new(Vec2::zero(), Direction::South),
 				DoorView::new(Vec2::zero(), Direction::West),
 			],
+
+			player_move_in_progress: false,
+			in_main_mode: true,
 		}
 	}
 
@@ -39,15 +45,28 @@ impl MapView {
 
 		build_map(&mut self.mb, &gamestate.map);
 
-		for view in self.door_views.iter_mut() {
-			view.update(&mut self.mb);
+		if self.player_can_move() {
+			for view in self.door_views.iter_mut() {
+				view.update(&mut self.mb);
+			}
 		}
 
 		gfx.update_mesh_from(&self.mb);
 		gfx.draw_mesh(self.mb.mesh_id);
 	}
 
+	fn player_can_move(&self) -> bool {
+		self.in_main_mode && !self.player_move_in_progress
+	}
+
+	pub fn on_mode_change(&mut self, mode: ControllerMode) {
+		self.in_main_mode = matches!(mode, ControllerMode::Main);
+	}
+
 	pub fn on_player_move(&mut self, gamestate: &GameState) {
+		assert!(self.player_can_move());
+		self.player_move_in_progress = true;
+
 		let world_pos = location_to_world(gamestate.player.location);
 		let room = gamestate.map.get(gamestate.player.location).unwrap();
 
@@ -57,8 +76,19 @@ impl MapView {
 		}
 	}
 
+	// TODO: this whole deal would probably be better off as a future
+	// what we're effectively waiting for is the player move animation to 
+	// finish, and for encounters to run
+	pub fn on_awaiting_player_command(&mut self) {
+		self.player_move_in_progress = false;
+	}
+
 	pub fn process_mouse_event(&mut self, event: ClickRegionEvent) -> Option<PlayerCommand> {
-		event.update_multiple(&mut self.door_views)
+		if self.player_can_move() {
+			event.update_multiple(&mut self.door_views)
+		} else {
+			None
+		}
 	}
 }
 

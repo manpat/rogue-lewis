@@ -164,6 +164,8 @@ impl GfxView {
 	fn run_command(&mut self, gamestate: &GameState, cmd: ViewCommand, promise: UntypedPromise) {
 		match cmd {
 			ViewCommand::GetPlayerCommand => {
+				self.map_view.on_awaiting_player_command();
+
 				let promise = promise.player_command();
 
 				if self.player_commands.is_empty() {
@@ -248,12 +250,17 @@ impl GfxView {
 				self.controller_mode_stack.push(mode);
 				println!("[view] mode transition -> {:?}", self.controller_mode_stack);
 
+				self.map_view.on_mode_change(mode);
+
 				promise.void().fulfill(());
 			}
 
 			ViewCommand::PopControllerMode => {
 				self.controller_mode_stack.pop();
 				println!("[view] mode transition {:?} <-", self.controller_mode_stack);
+
+				let current_ctl = self.current_controller_mode();
+				self.map_view.on_mode_change(current_ctl);
 
 				promise.void().fulfill(());
 			}

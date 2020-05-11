@@ -25,7 +25,7 @@ impl ClickRegionView {
 
 		for region in self.regions.iter_mut() { region.update() }
 
-		let base_col = Color::rgba(1.0, 0.4, 0.5, 0.4);
+		let base_col = Color::rgba(1.0, 0.4, 0.5, 0.2);
 		let hover_col = Color::rgba(1.0, 0.4, 0.5, 1.0);
 		let click_col = Color::white();
 
@@ -47,32 +47,35 @@ impl ClickRegionView {
 
 	pub fn gen_regions_for_room(&mut self, pos: Vec2) {
 		use crate::controller::main::PlayerCommand as MainCmd;
-		
+
+		let region_dist = 0.75;
+		let region_size = 0.6;
+
 		self.regions = vec![
 			ClickRegion {
-				pos: pos + Vec2::new(1.0, 0.0),
-				size: 0.3,
+				pos: pos + Vec2::new(region_dist, 0.0),
+				size: region_size,
 				state: ClickRegionState::Idle,
 				cmd: || PlayerCommand::Main(MainCmd::GoEast)
 			},
 
 			ClickRegion {
-				pos: pos + Vec2::new(-1.0, 0.0),
-				size: 0.3,
+				pos: pos + Vec2::new(-region_dist, 0.0),
+				size: region_size,
 				state: ClickRegionState::Idle,
 				cmd: || PlayerCommand::Main(MainCmd::GoWest)
 			},
 
 			ClickRegion {
-				pos: pos + Vec2::new(0.0, 1.0),
-				size: 0.3,
+				pos: pos + Vec2::new(0.0, region_dist),
+				size: region_size,
 				state: ClickRegionState::Idle,
 				cmd: || PlayerCommand::Main(MainCmd::GoSouth)
 			},
 
 			ClickRegion {
-				pos: pos + Vec2::new(0.0, -1.0),
-				size: 0.3,
+				pos: pos + Vec2::new(0.0, -region_dist),
+				size: region_size,
 				state: ClickRegionState::Idle,
 				cmd: || PlayerCommand::Main(MainCmd::GoNorth)
 			},

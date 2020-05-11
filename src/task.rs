@@ -1,10 +1,8 @@
 pub mod executor;
 pub mod promise;
-pub mod coordinator;
 
 pub use promise::{UntypedPromise, Promise, Promisable, FutureValue};
 pub use executor::Executor;
-pub use coordinator::Coordinator;
 
 use crate::prelude::*;
 
@@ -71,32 +69,32 @@ impl From<merchant::PlayerCommand> for PlayerCommand {
 
 
 pub async fn enter_mode(mode: ControllerMode) {
-	get_coordinator()
+	get_executor()
 		.schedule_view_command(ViewCommand::PushControllerMode(mode))
 		.await
 }
 
 pub async fn leave_mode() {
-	get_coordinator()
+	get_executor()
 		.schedule_view_command(ViewCommand::PopControllerMode)
 		.await
 }
 
 
 pub async fn get_player_command() -> PlayerCommand {
-	get_coordinator()
+	get_executor()
 		.schedule_view_command(ViewCommand::GetPlayerCommand)
 		.await
 }
 
 pub async fn show_map(whole_map: bool) {
-	get_coordinator()
+	get_executor()
 		.schedule_view_command(ViewCommand::ShowMap {whole_map})
 		.await
 }
 
 pub async fn show_inventory() {
-	get_coordinator()
+	get_executor()
 		.schedule_view_command(ViewCommand::ShowInventory)
 		.await
 }
@@ -112,8 +110,8 @@ pub async fn give_player_item(item: Item) {
 
 pub async fn give_player_item_n(item: Item, n: usize) {
 	let command = GameCommand::GivePlayerItem(item, n);
-	get_coordinator().schedule_model_command::<()>(command).await;
-	get_coordinator().schedule_view_command(ViewCommand::GameCommand(command)).await
+	get_executor().schedule_model_command::<()>(command).await;
+	get_executor().schedule_view_command(ViewCommand::GameCommand(command)).await
 }
 
 pub async fn consume_player_item(item: Item) -> bool {
@@ -123,11 +121,11 @@ pub async fn consume_player_item(item: Item) -> bool {
 pub async fn consume_player_item_n(item: Item, n: usize) -> bool {
 	let command = GameCommand::ConsumePlayerItem(item, n);
 
-	let success = get_coordinator().schedule_model_command(command).await;
+	let success = get_executor().schedule_model_command(command).await;
 	if success {
 		// TODO: maybe I want an event on failure and success?
 		// or maybe I want something more specific than just forwarding the GameCommand
-		get_coordinator()
+		get_executor()
 			.schedule_view_command(ViewCommand::GameCommand(command))
 			.await
 	}
@@ -137,39 +135,39 @@ pub async fn consume_player_item_n(item: Item, n: usize) -> bool {
 
 pub async fn heal_player(n: u32) {
 	let command = GameCommand::ModifyPlayerHealth(n as i32, HealthModifyReason::Heal);
-	get_coordinator().schedule_model_command::<bool>(command).await;
-	get_coordinator().schedule_view_command(ViewCommand::GameCommand(command)).await
+	get_executor().schedule_model_command::<bool>(command).await;
+	get_executor().schedule_view_command(ViewCommand::GameCommand(command)).await
 }
 
 pub async fn damage_player(n: u32, reason: HealthModifyReason) -> bool {
 	let command = GameCommand::ModifyPlayerHealth(-(n as i32), reason);
-	let still_alive = get_coordinator().schedule_model_command(command).await;
+	let still_alive = get_executor().schedule_model_command(command).await;
 	// TODO: pass status to view
-	get_coordinator().schedule_view_command::<()>(ViewCommand::GameCommand(command)).await;
+	get_executor().schedule_view_command::<()>(ViewCommand::GameCommand(command)).await;
 	still_alive
 }
 
 pub async fn starve_player() -> bool {
 	let command = GameCommand::StarvePlayer;
-	let still_alive = get_coordinator().schedule_model_command(command).await;
+	let still_alive = get_executor().schedule_model_command(command).await;
 	// TODO: pass status to view
-	get_coordinator().schedule_view_command::<()>(ViewCommand::GameCommand(command)).await;
+	get_executor().schedule_view_command::<()>(ViewCommand::GameCommand(command)).await;
 	still_alive
 }
 
 pub async fn sate_player() {
 	let command = GameCommand::SatePlayer;
-	get_coordinator().schedule_model_command::<()>(command).await;
+	get_executor().schedule_model_command::<()>(command).await;
 	// TODO: pass status to view
-	get_coordinator().schedule_view_command(ViewCommand::GameCommand(command)).await
+	get_executor().schedule_view_command(ViewCommand::GameCommand(command)).await
 }
 
 pub async fn move_player(dir: Direction) -> bool {
 	let command = GameCommand::MovePlayer(dir);
-	let did_move = get_coordinator().schedule_model_command(command).await;
+	let did_move = get_executor().schedule_model_command(command).await;
 	if did_move {
 		// TODO: pass success to view
-		get_coordinator().schedule_view_command::<()>(ViewCommand::GameCommand(command)).await;
+		get_executor().schedule_view_command::<()>(ViewCommand::GameCommand(command)).await;
 	}
 	did_move
 }
@@ -180,6 +178,6 @@ pub async fn move_player(dir: Direction) -> bool {
 
 pub async fn attack_enemy(damage: i32) {
 	let command = GameCommand::AttackEnemy(damage);
-	get_coordinator().schedule_model_command::<()>(command).await;
-	get_coordinator().schedule_view_command(ViewCommand::GameCommand(command)).await
+	get_executor().schedule_model_command::<()>(command).await;
+	get_executor().schedule_view_command(ViewCommand::GameCommand(command)).await
 }

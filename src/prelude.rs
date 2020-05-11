@@ -9,7 +9,7 @@ pub use std::future::Future;
 pub use std::error::Error;
 
 pub use crate::types::*;
-pub use crate::get_coordinator;
+pub use crate::get_executor;
 
 // pub type Result<T> = std::result::Result<T, failure::Error>;
 

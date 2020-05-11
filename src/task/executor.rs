@@ -3,26 +3,57 @@ use std::sync::{Arc, Mutex};
 use std::future::Future;
 use std::pin::Pin;
 
-pub struct Executor {
+use crate::prelude::*;
+use super::promise::*;
+use crate::view::{View, ViewCommand};
+use crate::gamestate::{GameState, GameCommand};
+
+pub(super) struct CommandQueues {
+	pub model_commands: Vec<(GameCommand, UntypedPromise)>,
+	pub view_commands: Vec<(ViewCommand, UntypedPromise)>,
+}
+
+struct TaskList {
 	tasks: Vec<ExecutorTask>,
 	task_id: usize,
+}
+
+pub struct Executor {
+	task_list: Arc<Mutex<TaskList>>,
 	wake_queue: Arc<Mutex<Vec<TaskId>>>,
+
+	command_queues: Rc<RefCell<CommandQueues>>,
+	hack_gamestate: GameStateHandle,
 }
 
 impl Executor {
-	pub fn new() -> Self {
-		Self {
+	pub fn new(hack_gamestate: GameStateHandle) -> Self {
+		let command_queues = CommandQueues {
+			model_commands: Vec::new(),
+			view_commands: Vec::new(),
+		};
+
+		let task_list = TaskList {
 			tasks: Vec::new(),
 			task_id: 0,
+		};
+
+		Self {
+			task_list: Arc::new(Mutex::new(task_list)),
 			wake_queue: Arc::new(Mutex::new(Vec::new())),
+
+			command_queues: Rc::new(RefCell::new(command_queues)),
+			hack_gamestate
 		}
 	}
 
-	pub fn queue<F>(&mut self, f: F) where F: Future<Output=()> + 'static {
-		self.task_id += 1;
-		let task_id = TaskId(self.task_id);
+	pub fn queue<F>(&self, f: F) where F: Future<Output=()> + 'static {
+		let mut task_list = self.task_list.lock().unwrap();
 
-		self.tasks.push(ExecutorTask{
+		task_list.task_id += 1;
+		let task_id = TaskId(task_list.task_id);
+
+		task_list.tasks.push(ExecutorTask{
 			future: Box::pin(f),
 			task_id,
 		});
@@ -31,18 +62,15 @@ impl Executor {
 	}
 
 	pub fn num_queued_tasks(&self) -> usize {
-		self.tasks.len()
+		self.task_list.lock().unwrap().tasks.len()
 	}
 
-	pub fn has_work_pending(&self) -> bool {
-		!self.wake_queue.lock().unwrap().is_empty()
-	}
-
-	pub fn poll(&mut self) {
+	pub fn resume_tasks(&self) {
 		let wake_queue = std::mem::replace(&mut *self.wake_queue.lock().unwrap(), Vec::new());
+		let mut task_list = self.task_list.lock().unwrap();
 
 		for task_id in wake_queue {
-			let task = self.tasks.iter_mut()
+			let task = task_list.tasks.iter_mut()
 				.find(|t| t.task_id == task_id)
 				.expect("Tried to wake nonexistant task id");
 
@@ -63,7 +91,39 @@ impl Executor {
 			}
 		}
 
-		self.tasks.retain(|t| t.task_id != INVALID_TASK_ID);
+		task_list.tasks.retain(|t| t.task_id != INVALID_TASK_ID);
+	}
+
+	pub fn process_commands(&self, gamestate: &mut GameState, view: &mut impl View) {
+		for (event, promise) in self.command_queues.borrow_mut().model_commands.drain(..) {
+			gamestate.submit_command(event, promise);
+		}
+
+		for (event, promise) in self.command_queues.borrow_mut().view_commands.drain(..) {
+			view.submit_command(event, promise);
+		}
+	}
+
+	pub fn hack_game(&self) -> std::cell::Ref<GameState> { self.hack_gamestate.borrow() }
+	pub fn hack_game_mut(&self) -> std::cell::RefMut<GameState> { self.hack_gamestate.borrow_mut() }
+
+
+	pub(super) fn schedule_view_command<O>(&self, cmd: ViewCommand) -> impl Future<Output=O>
+		where O: Promisable, Promise<O>: Into<UntypedPromise>
+	{
+		CommandFuture {
+			command_queues: Rc::clone(&self.command_queues),
+			state: CommandFutureState::ViewCommand(cmd)
+		}
+	}
+
+	pub(super) fn schedule_model_command<O>(&self, cmd: GameCommand) -> impl Future<Output=O>
+		where O: Promisable, Promise<O>: Into<UntypedPromise>
+	{
+		CommandFuture {
+			command_queues: Rc::clone(&self.command_queues),
+			state: CommandFutureState::GameCommand(cmd)
+		}
 	}
 }
 
@@ -121,4 +181,53 @@ fn new_task_raw_waker(task: Box<TaskState>) -> RawWaker {
 
 	let vtable = &RawWakerVTable::new(clone, wake, wake_by_ref, drop);
 	RawWaker::new(Box::into_raw(task) as *const _, vtable)
+}
+
+
+
+enum CommandFutureState<O: Promisable> {
+	ViewCommand(ViewCommand),
+	GameCommand(GameCommand),
+	Future(FutureValue<O>)
+}
+
+struct CommandFuture<O: Promisable> {
+	command_queues: Rc<RefCell<CommandQueues>>,
+	state: CommandFutureState<O>,
+}
+
+impl<O: Promisable> Future for CommandFuture<O> where Promise<O>: Into<UntypedPromise> {
+	type Output = O;
+
+	fn poll(mut self: Pin<&mut Self>, ctx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+		match self.state {
+			CommandFutureState::Future(ref mut future) => {
+				if future.ready() {
+					Poll::Ready(future.unwrap())
+				} else {
+					Poll::Pending
+				}
+			}
+
+			CommandFutureState::ViewCommand(cmd) => {
+				let promise = O::new_promise(ctx.waker().clone());
+				let future = promise.get_future();
+
+				self.command_queues.borrow_mut().view_commands.push((cmd, promise.into()));
+				self.state = CommandFutureState::Future(future);
+
+				Poll::Pending
+			}
+
+			CommandFutureState::GameCommand(cmd) => {
+				let promise = O::new_promise(ctx.waker().clone());
+				let future = promise.get_future();
+
+				self.command_queues.borrow_mut().model_commands.push((cmd, promise.into()));
+				self.state = CommandFutureState::Future(future);
+
+				Poll::Pending
+			}
+		}
+	}
 }

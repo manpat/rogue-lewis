@@ -18,7 +18,7 @@ mod enemy;
 use prelude::*;
 use gamestate::GameState;
 use view::View;
-use task::Coordinator;
+use task::Executor;
 
 fn main() {
 	if std::env::args().find(|s| s == "--text").is_some() {
@@ -30,38 +30,32 @@ fn main() {
 
 
 fn run_with_view(mut view: impl View) {
-	let mut executor = task::Executor::new();
-
 	let gamestate = generate_gamestate();
 	let gamestate = Rc::new(RefCell::new(gamestate));
-	let mut coordinator = Coordinator::new(Rc::clone(&gamestate));
 
 	unsafe {
-		COORDINATOR = Some(RefCell::new(coordinator.clone()));
+		let executor = task::Executor::new(Rc::clone(&gamestate));
+		EXECUTOR = Some(executor);
 	}
 
-	executor.queue(controller::run_main_controller());
+	get_executor().queue(controller::run_main_controller());
 
 	view.init(&gamestate.borrow());
 
-	while executor.num_queued_tasks() > 0 && !view.should_quit() {
-		// TODO: update gamestate and resume until a view event is being waited for
-		executor.poll();
-		coordinator.run(&mut gamestate.borrow_mut(), &mut view);
-
-		// TODO: update view until executor has things to wake
+	while get_executor().num_queued_tasks() > 0 && !view.should_quit() {
+		get_executor().resume_tasks();
+		get_executor().process_commands(&mut gamestate.borrow_mut(), &mut view);
 		view.update(&gamestate.borrow());
 	}
 }
 
 
-static mut COORDINATOR: Option<RefCell<Coordinator>> = None;
+static mut EXECUTOR: Option<Executor> = None;
 
-pub fn get_coordinator() -> std::cell::Ref<'static, Coordinator> {
+pub fn get_executor() -> &'static Executor {
 	unsafe {
-		COORDINATOR.as_ref()
-			.expect("Coordinator not initialised!")
-			.borrow()
+		EXECUTOR.as_ref()
+			.expect("Executor not initialised!")
 	}
 }
 

@@ -38,7 +38,7 @@ async fn run_player_attack(enemy_archetype: EnemyArchetype) {
 				_ => Hit,
 			};
 
-			let mut damage = get_coordinator().hack_game().player.attack();
+			let mut damage = get_executor().hack_game().player.attack();
 
 			match severity {
 				AttackSeverity::Crit => {
@@ -111,7 +111,7 @@ async fn run_enemy_attack(archetype: EnemyArchetype, severity: AttackSeverity, i
 		}
 	}
 
-	let player_defense = get_coordinator().hack_game_mut().player.defense();
+	let player_defense = get_executor().hack_game_mut().player.defense();
 	let shield_applied = player_defense > 0 && rng().gen_ratio(3, 4);
 
 	if shield_applied && !ignore_shield {
@@ -126,8 +126,8 @@ async fn run_enemy_attack(archetype: EnemyArchetype, severity: AttackSeverity, i
 pub async fn run_battle_controller() {
 	println!("[battle] enter");
 
-	let loc = get_coordinator().hack_game().player.location;
-	let archetype = get_coordinator().hack_game().get_enemy(loc)
+	let loc = get_executor().hack_game().player.location;
+	let archetype = get_executor().hack_game().get_enemy(loc)
 		.expect("Tried to start battle with no enemy")
 		.archetype;
 
@@ -141,7 +141,7 @@ pub async fn run_battle_controller() {
 
 	println!("Do you fight or run like a coward?");
 
-	while !get_coordinator().hack_game().get_enemy(loc).unwrap().is_dead() && !get_coordinator().hack_game().player.is_dead() {
+	while !get_executor().hack_game().get_enemy(loc).unwrap().is_dead() && !get_executor().hack_game().player.is_dead() {
 		let command = task::get_player_command().await;
 
 		match command.battle().unwrap() {
@@ -175,9 +175,9 @@ pub async fn run_battle_controller() {
 		}
 	}
 
-	if get_coordinator().hack_game().get_enemy(loc).unwrap().is_dead() {
+	if get_executor().hack_game().get_enemy(loc).unwrap().is_dead() {
 		println!("The strike is fatal! The {:?} is defeated!", archetype);
-		get_coordinator().hack_game_mut().remove_encounter_at(loc);
+		get_executor().hack_game_mut().remove_encounter_at(loc);
 	}
 
 	println!("[battle] leave");

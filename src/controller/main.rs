@@ -33,16 +33,16 @@ async fn try_move(dir: Direction) -> bool {
 			return true
 		} else {
 			println!("You have run out of food! You can travel {} rooms",
-				get_coordinator().hack_game_mut().player.hunger);
+				get_executor().hack_game_mut().player.hunger);
 		}
 	} else {
 		task::sate_player().await;
 	}
 
-	let player_pos = get_coordinator().hack_game_mut().player.location;
-	let current_room = get_coordinator().hack_game_mut().map.get(player_pos).unwrap();
+	let player_pos = get_executor().hack_game_mut().player.location;
+	let current_room = get_executor().hack_game_mut().map.get(player_pos).unwrap();
 
-	get_coordinator().hack_game_mut().map.mark_visited(player_pos);
+	get_executor().hack_game_mut().map.mark_visited(player_pos);
 
 	// TODO: leaving should be optional
 	if current_room.is_exit {
@@ -54,7 +54,7 @@ async fn try_move(dir: Direction) -> bool {
 		run_encounter(encounter_ty).await;
 
 		if !encounter_ty.is_persistent() {
-			get_coordinator().hack_game_mut().remove_encounter_at(player_pos);
+			get_executor().hack_game_mut().remove_encounter_at(player_pos);
 		}
 	}
 
@@ -98,9 +98,9 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		}
 
 		EncounterType::Monster => {
-			let player_loc = get_coordinator().hack_game().player.location;
-			if get_coordinator().hack_game_mut().get_enemy(player_loc).is_none() {
-				get_coordinator().hack_game_mut().spawn_enemy_at(player_loc, false);
+			let player_loc = get_executor().hack_game().player.location;
+			if get_executor().hack_game_mut().get_enemy(player_loc).is_none() {
+				get_executor().hack_game_mut().spawn_enemy_at(player_loc, false);
 			}
 
 			task::enter_mode(task::ControllerMode::Battle).await;
@@ -109,9 +109,9 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		}
 
 		EncounterType::Boss => {
-			let player_loc = get_coordinator().hack_game().player.location;
-			if get_coordinator().hack_game_mut().get_enemy(player_loc).is_none() {
-				get_coordinator().hack_game_mut().spawn_enemy_at(player_loc, true);
+			let player_loc = get_executor().hack_game().player.location;
+			if get_executor().hack_game_mut().get_enemy(player_loc).is_none() {
+				get_executor().hack_game_mut().spawn_enemy_at(player_loc, true);
 			}
 
 			task::enter_mode(task::ControllerMode::Battle).await;
@@ -138,7 +138,7 @@ pub async fn run_main_controller() {
 	// TODO: this doesn't make sense for a retained mode view
 	task::show_map(false).await;
 
-	'main_loop: while !get_coordinator().hack_game().player.is_dead() {
+	'main_loop: while !get_executor().hack_game().player.is_dead() {
 		// TODO: this should be moved to view, when input is requested
 		println!("Which way do you go?");
 
@@ -146,8 +146,8 @@ pub async fn run_main_controller() {
 			let command = task::get_player_command().await;
 
 			if let Some(command) = command.debug() {
-				let coordinator = get_coordinator().clone();
-				let mut state = coordinator.hack_game_mut();
+				let executor = get_executor();
+				let mut state = executor.hack_game_mut();
 				use crate::room::Room;
 
 				let ply_loc = state.player.location;
@@ -194,8 +194,8 @@ pub async fn run_main_controller() {
 					["battle"] => {
 						drop(state);
 
-						let loc = get_coordinator().hack_game_mut().player.location;
-						get_coordinator().hack_game_mut().spawn_enemy_at(loc, random());
+						let loc = get_executor().hack_game_mut().player.location;
+						get_executor().hack_game_mut().spawn_enemy_at(loc, random());
 
 						task::enter_mode(task::ControllerMode::Battle).await;
 						run_battle_controller().await;

@@ -1,18 +1,13 @@
 use crate::prelude::*;
 use super::util::*;
-use super::gfx;
-use super::vertex::ColorVertex;
-use super::mesh_builder::MeshBuilder;
+use super::gfx::{Gfx, ui::Context as UiContext};
 use super::click_region::*;
 
 use crate::task::{PlayerCommand, ControllerMode};
 use crate::gamestate::GameState;
 use crate::room::Room;
 
-type ColorMeshBuilder = MeshBuilder<ColorVertex>;
-
 pub struct MapView {
-	mb: ColorMeshBuilder,
 	door_views: [DoorView; 4],
 
 	player_move_in_progress: bool,
@@ -20,10 +15,8 @@ pub struct MapView {
 }
 
 impl MapView {
-	pub fn new(gfx: &mut gfx::Gfx) -> MapView {
+	pub fn new(gfx: &mut Gfx) -> MapView {
 		MapView {
-			mb: ColorMeshBuilder::new(gfx.new_mesh()),
-
 			door_views: [
 				DoorView::new(Vec2::zero(), Direction::North),
 				DoorView::new(Vec2::zero(), Direction::East),
@@ -40,19 +33,14 @@ impl MapView {
 		self.on_player_move(gamestate);
 	}
 
-	pub fn render(&mut self, gfx: &mut gfx::Gfx, gamestate: &GameState) {
-		self.mb.clear();
-
-		build_map(&mut self.mb, &gamestate.map);
+	pub fn render(&mut self, gfx: &mut Gfx, gamestate: &GameState) {
+		build_map(gfx, &gamestate.map);
 
 		if self.player_can_move() {
 			for view in self.door_views.iter_mut() {
-				view.update(&mut self.mb);
+				view.update(gfx);
 			}
 		}
-
-		gfx.update_mesh_from(&self.mb);
-		gfx.draw_mesh(self.mb.mesh_id);
 	}
 
 	fn player_can_move(&self) -> bool {
@@ -93,41 +81,24 @@ impl MapView {
 }
 
 
-fn build_room(mb: &mut ColorMeshBuilder, pos: Vec2, room: Room, visited: bool) {
+fn build_room(gfx: &mut Gfx, pos: Vec2, room: Room, visited: bool) {
 	let room_color = Color::grey(0.2);
 	let visited_room_color = Color::grey(0.4);
 	let color = if visited { visited_room_color } else { room_color };
 
-	let color = color.into();
-	let size = 0.5;
-
-	mb.add_quad(&[
-		ColorVertex::new((Vec2::new(-size,-size) + pos).to_x0z(), color),
-		ColorVertex::new((Vec2::new(-size, size) + pos).to_x0z(), color),
-		ColorVertex::new((Vec2::new( size, size) + pos).to_x0z(), color),
-		ColorVertex::new((Vec2::new( size,-size) + pos).to_x0z(), color),
-	]);
-
+	gfx.ui().quad(pos.to_x0z(), Vec2::splat(1.0), color, UiContext::World);
 
 	for dir in room.iter_neighbor_directions().map(direction_to_offset) {
 		let pos = pos + dir * 0.5;
-
-		let minor = dir.perp() * 0.2;
-		let major = dir * 0.5;
-
-		mb.add_quad(&[
-			ColorVertex::new((pos - minor - major).to_x0z(), color),
-			ColorVertex::new((pos + minor - major).to_x0z(), color),
-			ColorVertex::new((pos + minor + major).to_x0z(), color),
-			ColorVertex::new((pos - minor + major).to_x0z(), color),
-		]);
+		let size = dir + dir.perp() * 0.4;
+		gfx.ui().quad(pos.to_x0z(), size, color, UiContext::World);
 	}
 }
 
-fn build_map(mb: &mut ColorMeshBuilder, map: &crate::map::Map) {
+fn build_map(gfx: &mut Gfx, map: &crate::map::Map) {
 	for (location, room) in map.iter() {
 		let visited = map.visited(location);
-		build_room(mb, location_to_world(location), room, visited);
+		build_room(gfx, location_to_world(location), room, visited);
 	}
 }
 
@@ -175,7 +146,7 @@ impl DoorView {
 		};
 	}
 
-	fn update(&mut self, mb: &mut ColorMeshBuilder) {
+	fn update(&mut self, gfx: &mut Gfx) {
 		use DoorViewState::*;
 
 		let hover_fade_rate = 0.1;
@@ -208,31 +179,13 @@ impl DoorView {
 			Clicked(v) => (0.6 + 0.02, v.ease_back_in(hover_col, click_col)),
 		};
 
-		let pos = self.position().to_x0z();
-		let color = color.into();
-		let shadow_color = Color::grey_a(0.1, 0.1).into();
+		let shadow_color = Color::grey_a(0.1, 0.1);
 
-		let offset = direction_to_offset(self.dir);
+		let shadow_pos = self.position().to_x0z() + Vec3::from_y(0.005);
+		let main_pos = shadow_pos + Vec3::from_y(0.05);
 
-		let major = offset.to_x0z() * (size/2.0);
-		let minor = offset.perp().to_x0z() * (size/2.0);
-		let hover_dist = 0.05;
-
-		// Draw arrow shadow
-		mb.add_tri_fan(&[
-			ColorVertex::new(pos + major, shadow_color),
-			ColorVertex::new(pos - major + minor, shadow_color),
-			ColorVertex::new(pos - major * 0.5, shadow_color),
-			ColorVertex::new(pos - major - minor, shadow_color),
-		]);
-
-		// Draw main arrow
-		mb.add_tri_fan(&[
-			ColorVertex::new(pos + Vec3::from_y(hover_dist) + major, color),
-			ColorVertex::new(pos + Vec3::from_y(hover_dist) - major + minor, color),
-			ColorVertex::new(pos + Vec3::from_y(hover_dist) - major * 0.5, color),
-			ColorVertex::new(pos + Vec3::from_y(hover_dist) - major - minor, color),
-		]);
+		gfx.ui().arrow(self.dir, shadow_pos, size, shadow_color, UiContext::World);
+		gfx.ui().arrow(self.dir, main_pos, size, color, UiContext::World);
 	}
 }
 

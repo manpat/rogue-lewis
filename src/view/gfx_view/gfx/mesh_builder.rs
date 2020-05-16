@@ -1,5 +1,6 @@
 use super::vertex::Vertex;
-use super::gfx::{MeshID, Gfx};
+use super::Gfx;
+use super::mesh::MeshID;
 
 pub struct MeshBuilder<V: Vertex> {
 	pub mesh_id: MeshID<V>,

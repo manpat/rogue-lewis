@@ -1,12 +1,12 @@
 mod window;
 mod gfx;
-mod vertex;
-mod mesh_builder;
 mod util;
 mod click_region;
 
 mod map_view;
 mod player_view;
+mod battle_view;
+mod merchant_view;
 
 use crate::prelude::*;
 use crate::gamestate::{GameState, GameCommand, Inventory};
@@ -17,6 +17,8 @@ use util::*;
 
 use map_view::MapView;
 use player_view::PlayerView;
+use battle_view::BattleView;
+use merchant_view::MerchantView;
 
 use click_region::ClickRegionEvent;
 use gfx::Gfx;
@@ -44,6 +46,8 @@ pub struct GfxView {
 
 	map_view: MapView,
 	player_view: PlayerView,
+	battle_view: BattleView,
+	merchant_view: MerchantView,
 }
 
 
@@ -57,15 +61,17 @@ impl GfxView {
 			gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA)
 		}
 
-		let shader = gfx.new_shader(
+		let shader = gfx.core().new_shader(
 			include_str!("gfx_view/vert.glsl"),
 			include_str!("gfx_view/frag.glsl"),
 			&["a_vertex", "a_color"]
 		);
-		gfx.use_shader(shader);
+		gfx.core().use_shader(shader);
 
 		let map_view = MapView::new(&mut gfx);
 		let player_view = PlayerView::new(&mut gfx);
+		let battle_view = BattleView::new();
+		let merchant_view = MerchantView::new();
 
 		GfxView {
 			commands: Vec::new(),
@@ -89,6 +95,8 @@ impl GfxView {
 
 			map_view,
 			player_view,
+			battle_view,
+			merchant_view,
 		}
 	}
 
@@ -108,7 +116,12 @@ impl GfxView {
 		let ui_pos = screen_pos;
 
 		let event = ClickRegionEvent::new_move(ui_pos, world_pos);
-		let _ = self.map_view.process_mouse_event(event);
+
+		let _ = match self.current_controller_mode() {
+			ControllerMode::Main => self.map_view.process_mouse_event(event),
+			ControllerMode::Battle => self.battle_view.process_mouse_event(event),
+			ControllerMode::Merchant => self.merchant_view.process_mouse_event(event),
+		};
 	}
 
 	fn process_click(&mut self, pos: Vec2) {
@@ -121,7 +134,14 @@ impl GfxView {
 		let ui_pos = screen_pos;
 
 		let event = ClickRegionEvent::new_click(ui_pos, world_pos);
-		if let Some(cmd) = self.map_view.process_mouse_event(event) {
+
+		let cmd = match self.current_controller_mode() {
+			ControllerMode::Main => self.map_view.process_mouse_event(event),
+			ControllerMode::Battle => self.battle_view.process_mouse_event(event),
+			ControllerMode::Merchant => self.merchant_view.process_mouse_event(event),
+		};
+
+		if let Some(cmd) = cmd {
 			self.push_player_command(cmd);
 		}
 	}
@@ -251,6 +271,8 @@ impl GfxView {
 				println!("[view] mode transition -> {:?}", self.controller_mode_stack);
 
 				self.map_view.on_mode_change(mode);
+				self.battle_view.on_mode_change(mode);
+				self.merchant_view.on_mode_change(mode);
 
 				promise.void().fulfill(());
 			}
@@ -261,6 +283,8 @@ impl GfxView {
 
 				let current_ctl = self.current_controller_mode();
 				self.map_view.on_mode_change(current_ctl);
+				self.battle_view.on_mode_change(current_ctl);
+				self.merchant_view.on_mode_change(current_ctl);
 
 				promise.void().fulfill(());
 			}
@@ -301,18 +325,24 @@ impl View for GfxView {
 		self.camera_forward = orientation.forward();
 
 		self.camera_proj_view = projection * orientation.conjugate().to_mat4() * translation;
-		// let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
+		let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
 
-		self.gfx.set_viewport(window_size);
+		self.gfx.core().set_viewport(window_size);
 
-		self.gfx.set_bg_color(Color::grey(0.1));
-		self.gfx.clear();
+		self.gfx.core().set_bg_color(Color::grey(0.1));
+		self.gfx.core().clear();
+		self.gfx.ui().clear();
 
-		self.gfx.set_uniform_mat4("u_proj_view", &self.camera_proj_view);
+		self.gfx.core().set_uniform_mat4("u_proj_view", &self.camera_proj_view);
 		self.map_view.render(&mut self.gfx, gamestate);
+		self.battle_view.render(&mut self.gfx, gamestate);
+		self.merchant_view.render(&mut self.gfx, gamestate);
 		self.player_view.render(&mut self.gfx, gamestate);
 
-		// self.gfx.set_uniform_mat4("u_proj_view", &ui_proj_view);
+		self.gfx.draw_world_ui();
+
+		self.gfx.core().set_uniform_mat4("u_proj_view", &ui_proj_view);
+		self.gfx.draw_screen_ui();
 
 		self.window.swap();
 	}

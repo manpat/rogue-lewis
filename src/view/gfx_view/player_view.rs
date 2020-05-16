@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use super::util::*;
 use super::gfx;
-use super::vertex::ColorVertex;
-use super::mesh_builder::MeshBuilder;
+use super::gfx::vertex::ColorVertex;
+use super::gfx::mesh_builder::MeshBuilder;
 
 use crate::gamestate::GameState;
 use crate::task::Promise;
@@ -19,7 +19,7 @@ pub struct PlayerView {
 impl PlayerView {
 	pub fn new(gfx: &mut gfx::Gfx) -> PlayerView {
 		PlayerView {
-			mb: ColorMeshBuilder::new(gfx.new_mesh()),
+			mb: ColorMeshBuilder::new(gfx.core().new_mesh()),
 			pos: Vec3::zero(),
 			move_animation: None,
 		}
@@ -60,8 +60,8 @@ impl PlayerView {
 
 		self.mb.add_quad(&vs);
 
-		gfx.update_mesh_from(&self.mb);
-		gfx.draw_mesh(self.mb.mesh_id);
+		gfx.core().update_mesh_from(&self.mb);
+		gfx.core().draw_mesh(self.mb.mesh_id);
 	}
 
 	pub fn on_player_move(&mut self, to: Location, promise: Promise<()>) {

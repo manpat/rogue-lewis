@@ -51,7 +51,7 @@ impl fmt::Display for RenderBuffer {
 			for x in 0..self.width {
 				write!(f, "{}", get_ch(x, y))?;
 			}
-			write!(f, "\n")?;
+			writeln!(f, "")?;
 		}
 
 		for x in 0..self.width {

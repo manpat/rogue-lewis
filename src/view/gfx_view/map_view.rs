@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use super::util::*;
-use super::gfx::{Gfx, ui::Context as UiContext};
-use super::click_region::*;
+use super::gfx::{Gfx, ui};
 
 use crate::task::{PlayerCommand, ControllerMode};
 use crate::gamestate::GameState;
@@ -70,14 +69,6 @@ impl MapView {
 	pub fn on_awaiting_player_command(&mut self) {
 		self.player_move_in_progress = false;
 	}
-
-	pub fn process_mouse_event(&mut self, event: ClickRegionEvent) -> Option<PlayerCommand> {
-		if self.player_can_move() {
-			event.update_multiple(&mut self.door_views)
-		} else {
-			None
-		}
-	}
 }
 
 
@@ -86,12 +77,12 @@ fn build_room(gfx: &mut Gfx, pos: Vec2, room: Room, visited: bool) {
 	let visited_room_color = Color::grey(0.4);
 	let color = if visited { visited_room_color } else { room_color };
 
-	gfx.ui().quad(pos.to_x0z(), Vec2::splat(1.0), color, UiContext::World);
+	gfx.ui().quad(pos.to_x0z(), Vec2::splat(1.0), color, ui::Context::Ground);
 
 	for dir in room.iter_neighbor_directions().map(direction_to_offset) {
 		let pos = pos + dir * 0.5;
 		let size = dir + dir.perp() * 0.4;
-		gfx.ui().quad(pos.to_x0z(), size, color, UiContext::World);
+		gfx.ui().quad(pos.to_x0z(), size, color, ui::Context::Ground);
 	}
 }
 
@@ -112,70 +103,61 @@ fn direction_to_offset(d: Direction) -> Vec2 {
 }
 
 
-
-
-
-enum DoorViewState {
-	Hidden,
-	Idle,
-	Hovering(f32),
-	HoverExit(f32),
-	Clicked(f32),
-}
-
+use super::gfx::ui::{Hoverable, HoverState};
 
 struct DoorView {
+	enabled: bool,
 	pos: Vec2,
 	dir: Direction,
-	state: DoorViewState,
+	hoverable: Hoverable,
 }
 
 impl DoorView {
 	fn new(pos: Vec2, dir: Direction) -> Self {
 		Self {
+			enabled: true,
 			pos, dir,
-			state: DoorViewState::Idle,
+			hoverable: Hoverable::new(0.1, 0.1),
 		}
 	}
 
 	fn set_enabled(&mut self, enabled: bool) {
-		self.state = if enabled {
-			DoorViewState::Idle
-		} else {
-			DoorViewState::Hidden
-		};
+		self.enabled = enabled;
+		if self.enabled {
+			self.hoverable.reset();
+		}
 	}
 
+	fn position(&self) -> Vec2 { self.pos + direction_to_offset(self.dir) * 0.75 }
+
 	fn update(&mut self, gfx: &mut Gfx) {
-		use DoorViewState::*;
+		if !self.enabled { return }
 
-		let hover_fade_rate = 0.1;
-		let click_fade_rate = 0.1;
+		use crate::controller::main::PlayerCommand::*;
 
-		self.state = match self.state {
-			Hidden => return,
+		let dir = self.dir;
+		let region = ui::Region::new_ground(self.position().to_x0z(), Vec2::splat(0.6));
 
-			Idle => Idle,
-
-			Hovering(v) => Hovering((v+hover_fade_rate).min(1.0)),
-
-			HoverExit(v) => if v > 0.0 {
-				HoverExit((v-hover_fade_rate).max(0.0))
-			} else {
-				Idle
-			},
-
-			Clicked(v) => if v > 0.0 { Clicked((v-click_fade_rate).max(0.0)) } else { Hovering(1.0) },
-		};
+		gfx.ui().update_interact_region(
+			&mut self.hoverable,
+			&region,
+			|| match dir {
+				Direction::North => GoNorth,
+				Direction::East => GoEast,
+				Direction::South => GoSouth,
+				Direction::West => GoWest,
+			}
+		);
 
 		let base_col = Color::rgba(1.0, 0.4, 0.5, 0.2);
 		let hover_col = Color::rgba(1.0, 0.4, 0.5, 1.0);
 		let click_col = Color::white();
 
-		let (size, color) = match self.state {
-			Hidden => unreachable!(),
+		use HoverState::*;
+		let (size, color) = match self.hoverable.state() {
 			Idle => (0.6, base_col),
-			Hovering(v) | HoverExit(v) => (0.6 + v*0.02, v.ease_linear(base_col, hover_col)),
+			HoverEnter(v) | HoverExit(v) => (0.6 + v*0.02, v.ease_linear(base_col, hover_col)),
+			Hovering => (0.62, hover_col),
 			Clicked(v) => (0.6 + 0.02, v.ease_back_in(hover_col, click_col)),
 		};
 
@@ -184,54 +166,7 @@ impl DoorView {
 		let shadow_pos = self.position().to_x0z() + Vec3::from_y(0.005);
 		let main_pos = shadow_pos + Vec3::from_y(0.05);
 
-		gfx.ui().arrow(self.dir, shadow_pos, size, shadow_color, UiContext::World);
-		gfx.ui().arrow(self.dir, main_pos, size, color, UiContext::World);
+		gfx.ui().arrow(self.dir, shadow_pos, size, shadow_color, ui::Context::Ground);
+		gfx.ui().arrow(self.dir, main_pos, size, color, ui::Context::Ground);
 	}
 }
-
-impl ClickRegion for DoorView {
-	type ClickResponse = PlayerCommand;
-
-	fn context(&self) -> ClickRegionContext { ClickRegionContext::Ground }
-
-	fn position(&self) -> Vec2 { self.pos + direction_to_offset(self.dir) * 0.75 }
-	fn size(&self) -> Vec2 {
-		if matches!(self.state, DoorViewState::Hidden) {
-			Vec2::zero()
-		} else {
-			Vec2::splat(0.6)
-		}
-	}
-
-	fn while_mouse_over(&mut self) {
-		use DoorViewState::*;
-
-		self.state = match self.state {
-			Idle => Hovering(0.0),
-			HoverExit(v) => Hovering(v),
-			_ => return,
-		};
-	}
-
-	fn while_mouse_not_over(&mut self) {
-		use DoorViewState::*;
-
-		self.state = match self.state {
-			Hovering(v) => HoverExit(v),
-			_ => return,
-		};
-	}
-
-	fn on_click(&mut self) -> PlayerCommand {
-		use crate::controller::main::PlayerCommand::*;
-
-		self.state = DoorViewState::Clicked(1.0);
-		match self.dir {
-			Direction::North => PlayerCommand::from(GoNorth),
-			Direction::East => PlayerCommand::from(GoEast),
-			Direction::South => PlayerCommand::from(GoSouth),
-			Direction::West => PlayerCommand::from(GoWest),
-		}
-	}
-}
-

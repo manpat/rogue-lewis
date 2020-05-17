@@ -1,7 +1,6 @@
 mod window;
 mod gfx;
 mod util;
-mod click_region;
 
 mod map_view;
 mod player_view;
@@ -20,7 +19,6 @@ use player_view::PlayerView;
 use battle_view::BattleView;
 use merchant_view::MerchantView;
 
-use click_region::ClickRegionEvent;
 use gfx::Gfx;
 
 
@@ -106,51 +104,13 @@ impl GfxView {
 			.unwrap_or(ControllerMode::Main)
 	}
 
-	fn process_move(&mut self, pos: Vec2) {
-		let screen_pos = window_to_screen(self.window.size(), pos);
-
-		let near_plane_pos = self.camera_proj_view.inverse() * screen_pos.extend(0.0).extend(1.0);
-		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
-
-		let world_pos = intersect_ground(near_plane_pos, self.camera_forward);
-		let ui_pos = screen_pos;
-
-		let event = ClickRegionEvent::new_move(ui_pos, world_pos);
-
-		let _ = match self.current_controller_mode() {
-			ControllerMode::Main => self.map_view.process_mouse_event(event),
-			ControllerMode::Battle => self.battle_view.process_mouse_event(event),
-			ControllerMode::Merchant => self.merchant_view.process_mouse_event(event),
-		};
-	}
-
-	fn process_click(&mut self, pos: Vec2) {
-		let screen_pos = window_to_screen(self.window.size(), pos);
-
-		let near_plane_pos = self.camera_proj_view.inverse() * screen_pos.extend(0.0).extend(1.0);
-		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
-
-		let world_pos = intersect_ground(near_plane_pos, self.camera_forward);
-		let ui_pos = screen_pos;
-
-		let event = ClickRegionEvent::new_click(ui_pos, world_pos);
-
-		let cmd = match self.current_controller_mode() {
-			ControllerMode::Main => self.map_view.process_mouse_event(event),
-			ControllerMode::Battle => self.battle_view.process_mouse_event(event),
-			ControllerMode::Merchant => self.merchant_view.process_mouse_event(event),
-		};
-
-		if let Some(cmd) = cmd {
-			self.push_player_command(cmd);
-		}
-	}
-
 	fn process_events(&mut self) {
 		use crate::controller::main::PlayerCommand::*;
 
 		use glutin::{WindowEvent, ElementState::Pressed, MouseButton::Left as LeftMouse};
 		use glutin::dpi::PhysicalPosition;
+
+		self.gfx.ui().clear_click_state();
 
 		let events = self.window.poll_events();
 
@@ -158,18 +118,23 @@ impl GfxView {
 			match event {
 				WindowEvent::CursorMoved {position, ..} => {
 					let PhysicalPosition{x, y} = position.to_physical(self.window.dpi());
-					self.mouse_pos = Vec2::new(x as f32, y as f32);
-					self.process_move(self.mouse_pos);
+					let pos = Vec2::new(x as f32, y as f32);
+					self.mouse_pos = window_to_screen(self.window.size(), pos);
+					self.gfx.ui().on_mouse_move(self.mouse_pos);
 				}
 
 				WindowEvent::MouseInput {state: Pressed, button: LeftMouse, ..} => {
-					self.process_click(self.mouse_pos);
+					self.gfx.ui().on_mouse_click();
 				}
 
 				WindowEvent::CloseRequested => self.push_player_command(PlayerCommand::Main(Quit)),
 
 				_ => {}
 			}
+		}
+
+		for cmd in self.gfx.ui().drain_commands() {
+			self.push_player_command(cmd);
 		}
 	}
 
@@ -327,11 +292,15 @@ impl View for GfxView {
 		self.camera_proj_view = projection * orientation.conjugate().to_mat4() * translation;
 		let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
 
+		let near_plane_pos = self.camera_proj_view.inverse() * self.mouse_pos.extend(0.0).extend(1.0);
+		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
+
 		self.gfx.core().set_viewport(window_size);
 
 		self.gfx.core().set_bg_color(Color::grey(0.1));
 		self.gfx.core().clear();
 		self.gfx.ui().clear();
+		self.gfx.ui().update(self.camera_forward, near_plane_pos);
 
 		self.gfx.core().set_uniform_mat4("u_proj_view", &self.camera_proj_view);
 		self.map_view.render(&mut self.gfx, gamestate);

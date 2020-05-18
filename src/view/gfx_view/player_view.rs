@@ -25,7 +25,7 @@ impl PlayerView {
 		}
 	}
 
-	pub fn render(&mut self, gfx: &mut gfx::Gfx, gamestate: &GameState) {
+	pub fn update(&mut self, gfx: &mut gfx::Gfx, gamestate: &GameState) {
 		let anim_finished = if let Some(MoveAnimation {from, to, ref mut phase, ..}) = self.move_animation {
 			*phase += 0.015;
 

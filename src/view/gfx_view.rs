@@ -3,9 +3,11 @@ mod gfx;
 mod util;
 
 mod map_view;
-mod player_view;
 mod battle_view;
 mod merchant_view;
+
+mod player_view;
+mod hud_view;
 
 use crate::prelude::*;
 use crate::gamestate::{GameState, GameCommand, Inventory};
@@ -18,6 +20,7 @@ use map_view::MapView;
 use player_view::PlayerView;
 use battle_view::BattleView;
 use merchant_view::MerchantView;
+use hud_view::HudView;
 
 use gfx::Gfx;
 
@@ -46,6 +49,7 @@ pub struct GfxView {
 	player_view: PlayerView,
 	battle_view: BattleView,
 	merchant_view: MerchantView,
+	hud_view: HudView,
 }
 
 
@@ -70,6 +74,7 @@ impl GfxView {
 		let player_view = PlayerView::new(&mut gfx);
 		let battle_view = BattleView::new();
 		let merchant_view = MerchantView::new();
+		let hud_view = HudView::new();
 
 		GfxView {
 			commands: Vec::new(),
@@ -95,6 +100,7 @@ impl GfxView {
 			player_view,
 			battle_view,
 			merchant_view,
+			hud_view,
 		}
 	}
 
@@ -300,13 +306,14 @@ impl View for GfxView {
 		self.gfx.core().set_bg_color(Color::grey(0.1));
 		self.gfx.core().clear();
 		self.gfx.ui().clear();
-		self.gfx.ui().update(self.camera_forward, near_plane_pos);
+		self.gfx.ui().update(self.camera_forward, near_plane_pos, aspect);
 
 		self.gfx.core().set_uniform_mat4("u_proj_view", &self.camera_proj_view);
-		self.map_view.render(&mut self.gfx, gamestate);
-		self.battle_view.render(&mut self.gfx, gamestate);
-		self.merchant_view.render(&mut self.gfx, gamestate);
-		self.player_view.render(&mut self.gfx, gamestate);
+		self.map_view.update(&mut self.gfx, gamestate);
+		self.battle_view.update(&mut self.gfx, gamestate);
+		self.merchant_view.update(&mut self.gfx, gamestate);
+		self.player_view.update(&mut self.gfx, gamestate);
+		self.hud_view.update(&mut self.gfx, gamestate);
 
 		self.gfx.draw_world_ui();
 

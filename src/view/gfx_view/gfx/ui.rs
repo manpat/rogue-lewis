@@ -9,7 +9,34 @@ pub type UiVertex = ColorVertex;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Context {
-	Screen, Ground,
+	ScreenCenter,
+	ScreenTopLeft,
+	ScreenTopRight,
+	ScreenBottomLeft,
+	ScreenBottomRight,
+	Ground,
+}
+
+impl Context {
+	pub fn is_screen(&self) -> bool {
+		use Context::*;
+
+		matches!(
+			self,
+			ScreenCenter
+			| ScreenTopLeft | ScreenTopRight
+			| ScreenBottomLeft | ScreenBottomRight
+		)
+	}
+
+	pub fn is_world(&self) -> bool {
+		use Context::*;
+
+		matches!(
+			self,
+			Ground
+		)
+	}
 }
 
 
@@ -20,6 +47,7 @@ pub struct Ui {
 	camera_forward: Vec3,
 	camera_near_pos: Vec3,
 	screen_mouse: Vec2,
+	aspect: f32,
 
 	commands: Vec<PlayerCommand>,
 	click_occured: bool,
@@ -34,6 +62,7 @@ impl Ui {
 			camera_forward: Vec3::zero(),
 			camera_near_pos: Vec3::zero(),
 			screen_mouse: Vec2::zero(),
+			aspect: 1.0,
 
 			commands: Vec::new(),
 			click_occured: false,
@@ -45,9 +74,10 @@ impl Ui {
 		self.dumb_arrows.clear();
 	}
 
-	pub fn update(&mut self, camera_forward: Vec3, camera_near_pos: Vec3) {
+	pub fn update(&mut self, camera_forward: Vec3, camera_near_pos: Vec3, aspect: f32) {
 		self.camera_forward = camera_forward;
 		self.camera_near_pos = camera_near_pos;
+		self.aspect = aspect;
 	}
 
 	pub fn drain_commands(&mut self) -> Vec<PlayerCommand> {
@@ -68,7 +98,7 @@ impl Ui {
 
 	pub(super) fn build_world_space(&mut self, mb: &mut MeshBuilder<UiVertex>) {
 		for &DumbQuad {pos, size, color, ..} in 
-			self.dumb_quads.iter().filter(|q| matches!(q.context, Context::Ground))
+			self.dumb_quads.iter().filter(|q| q.context.is_world())
 		{
 			let size = size / 2.0;
 			let color = color.into();
@@ -82,7 +112,7 @@ impl Ui {
 		}
 
 		for &DumbArrow {direction, pos, size, color, ..} in 
-			self.dumb_arrows.iter().filter(|q| matches!(q.context, Context::Ground))
+			self.dumb_arrows.iter().filter(|a| a.context.is_world())
 		{
 			let color = color.into();
 			let offset = direction_to_offset(direction);
@@ -101,17 +131,31 @@ impl Ui {
 	}
 
 	pub(super) fn build_screen_space(&mut self, mb: &mut MeshBuilder<UiVertex>) {
-		for &DumbQuad {pos, size, color, ..} in 
-			self.dumb_quads.iter().filter(|q| matches!(q.context, Context::Screen))
+		use Context::*;
+
+		let aspect = aspect_to_vec(self.aspect).extend(1.0);
+
+		for &DumbQuad {pos, size, color, context} in 
+			self.dumb_quads.iter().filter(|q| q.context.is_screen())
 		{
 			let size = size / 2.0;
 			let color = color.into();
 
+			let origin = match context {
+				ScreenCenter => Vec3::zero(),
+				ScreenTopLeft => Vec3::new(-1.0,  1.0, 0.0) * aspect,
+				ScreenBottomLeft => Vec3::new(-1.0, -1.0, 0.0) * aspect,
+				ScreenTopRight => Vec3::new( 1.0,  1.0, 0.0) * aspect,
+				ScreenBottomRight => Vec3::new( 1.0, -1.0, 0.0) * aspect,
+
+				_ => unreachable!()
+			};
+
 			mb.add_quad(&[
-				UiVertex::new(Vec3::new(-size.x, -size.y, 0.0) + pos, color),
-				UiVertex::new(Vec3::new(-size.x,  size.y, 0.0) + pos, color),
-				UiVertex::new(Vec3::new( size.x,  size.y, 0.0) + pos, color),
-				UiVertex::new(Vec3::new( size.x, -size.y, 0.0) + pos, color),
+				UiVertex::new(Vec3::new(-size.x, -size.y, 0.0) + pos + origin, color),
+				UiVertex::new(Vec3::new(-size.x,  size.y, 0.0) + pos + origin, color),
+				UiVertex::new(Vec3::new( size.x,  size.y, 0.0) + pos + origin, color),
+				UiVertex::new(Vec3::new( size.x, -size.y, 0.0) + pos + origin, color),
 			]);
 		}
 	}
@@ -184,6 +228,13 @@ pub struct Region {
 }
 
 impl Region {
+	pub fn new(pos: Vec3, size: Vec2, context: Context) -> Region {
+		Region {
+			pos, size,
+			context,
+		}
+	}
+
 	pub fn new_ground(pos: Vec3, size: Vec2) -> Region {
 		Region {
 			pos, size,
@@ -191,17 +242,26 @@ impl Region {
 		}
 	}
 
-	pub fn new_screen(pos: Vec3, size: Vec2) -> Region {
-		Region {
-			pos, size,
-			context: Context::Screen,
-		}
-	}
-
 	fn includes(&self, ui: &Ui) -> bool {
 		let (self_pos, mouse_pos) = match self.context {
-			Context::Screen => (self.pos.to_xy(), ui.screen_mouse),
-			Context::Ground => {
+			ctx if ctx.is_screen() => {
+				let aspect = aspect_to_vec(ui.aspect);
+				let view_mouse = ui.screen_mouse * aspect;
+
+				let origin = match ctx {
+					Context::ScreenCenter => Vec2::zero(),
+					Context::ScreenTopLeft => Vec2::new(-1.0,  1.0) * aspect,
+					Context::ScreenBottomLeft => Vec2::new(-1.0, -1.0) * aspect,
+					Context::ScreenTopRight => Vec2::new( 1.0,  1.0) * aspect,
+					Context::ScreenBottomRight => Vec2::new( 1.0, -1.0) * aspect,
+
+					_ => unreachable!()
+				};
+
+				(self.pos.to_xy() + origin, view_mouse)
+			}
+
+			ctx if ctx.is_world() => {
 				let plane_pos = Vec3::from_y(self.pos.y);
 				let plane_normal = Vec3::from_y(1.0);
 
@@ -215,6 +275,8 @@ impl Region {
 					None => return false,
 				}
 			}
+
+			_ => unreachable!()
 		};
 
 		let diff = self_pos - mouse_pos;
@@ -311,5 +373,75 @@ impl Hoverable {
 impl Default for Hoverable {
 	fn default() -> Hoverable {
 		Hoverable::new(0.1, 0.1)
+	}
+}
+
+
+
+pub struct HoverablePalette {
+	pub base: Color,
+	pub hover: Color,
+	pub click: Color,
+}
+
+impl HoverablePalette {
+	pub fn new(base: Color) -> HoverablePalette {
+		HoverablePalette {
+			base,
+			hover: 0.5f32.ease_linear(base, Color::white()),
+			click: Color::white(),
+		}
+	}
+
+	pub fn with_hover(mut self, hover: Color) -> HoverablePalette {
+		HoverablePalette { hover, .. self }
+	}
+
+	pub fn color(&self, state: HoverState) -> Color {
+		use HoverState::*;
+
+		match state {
+			Idle => self.base,
+			HoverEnter(v) | HoverExit(v) => v.ease_linear(self.base, self.hover),
+			Hovering => self.hover,
+			Clicked(v) => v.ease_back_in(self.hover, self.click),
+		}
+	}
+}
+
+
+fn aspect_to_vec(aspect: f32) -> Vec2 {
+	if aspect < 1.0 {
+		Vec2::new(1.0, 1.0 / aspect)
+	} else {
+		Vec2::new(aspect, 1.0)
+	}
+}
+
+
+
+
+
+pub struct GlobalPalette {
+	pub health: HoverablePalette,
+	pub food: HoverablePalette,
+	pub hunger: HoverablePalette,
+	pub map: HoverablePalette,
+	pub treasure: HoverablePalette,
+}
+
+static mut GLOBAL_PALETTE: Option<GlobalPalette> = None;
+
+pub fn palette() -> &'static GlobalPalette {
+	unsafe {
+		GLOBAL_PALETTE.get_or_insert_with(|| {
+			GlobalPalette {
+				health: HoverablePalette::new(Color::rgb(0.9, 0.3, 0.3)),
+				hunger: HoverablePalette::new(Color::rgb(0.8, 0.7, 0.3)),
+				map: HoverablePalette::new(Color::rgb(0.5, 0.0, 1.0)),
+				food: HoverablePalette::new(Color::rgb(0.6, 0.5, 0.2)),
+				treasure: HoverablePalette::new(Color::rgb(0.3, 0.6, 0.2)),
+			}
+		})
 	}
 }

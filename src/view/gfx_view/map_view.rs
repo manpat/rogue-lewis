@@ -32,7 +32,7 @@ impl MapView {
 		self.on_player_move(gamestate);
 	}
 
-	pub fn render(&mut self, gfx: &mut Gfx, gamestate: &GameState) {
+	pub fn update(&mut self, gfx: &mut Gfx, gamestate: &GameState) {
 		build_map(gfx, &gamestate.map);
 
 		if self.player_can_move() {

@@ -36,7 +36,6 @@ pub struct GfxView {
 
 	window: window::Window,
 	gfx: Gfx,
-	camera: gfx::Camera,
 
 	should_quit: bool,
 	mouse_pos: Vec2,
@@ -59,12 +58,12 @@ impl GfxView {
 			gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA)
 		}
 
-		let shader = gfx.core().new_shader(
+		let shader = gfx.core.new_shader(
 			include_str!("gfx_view/vert.glsl"),
 			include_str!("gfx_view/frag.glsl"),
 			&["a_vertex", "a_color"]
 		);
-		gfx.core().use_shader(shader);
+		gfx.core.use_shader(shader);
 
 		let map_view = MapView::new(&mut gfx);
 		let player_view = PlayerView::new(&mut gfx);
@@ -81,7 +80,6 @@ impl GfxView {
 
 			window,
 			gfx,
-			camera: gfx::Camera::new(),
 
 			should_quit: false,
 			mouse_pos: Vec2::zero(),
@@ -106,7 +104,7 @@ impl GfxView {
 		use glutin::{WindowEvent, ElementState::Pressed, MouseButton::Left as LeftMouse};
 		use glutin::dpi::PhysicalPosition;
 
-		self.gfx.ui().clear_click_state();
+		self.gfx.ui.clear_click_state();
 
 		let events = self.window.poll_events();
 
@@ -116,11 +114,11 @@ impl GfxView {
 					let PhysicalPosition{x, y} = position.to_physical(self.window.dpi());
 					let pos = Vec2::new(x as f32, y as f32);
 					self.mouse_pos = window_to_screen(self.window.size(), pos);
-					self.gfx.ui().on_mouse_move(self.mouse_pos);
+					self.gfx.ui.on_mouse_move(self.mouse_pos);
 				}
 
 				WindowEvent::MouseInput {state: Pressed, button: LeftMouse, ..} => {
-					self.gfx.ui().on_mouse_click();
+					self.gfx.ui.on_mouse_click();
 				}
 
 				WindowEvent::CloseRequested => self.push_player_command(PlayerCommand::Main(Quit)),
@@ -129,7 +127,7 @@ impl GfxView {
 			}
 		}
 
-		for cmd in self.gfx.ui().drain_commands() {
+		for cmd in self.gfx.ui.drain_commands() {
 			self.push_player_command(cmd);
 		}
 	}
@@ -214,7 +212,7 @@ impl GfxView {
 						println!("You move {}", dir);
 						let world_loc = location_to_world(gamestate.player.location);
 
-						self.camera.move_to(world_loc.to_x0z());
+						self.gfx.camera.move_to(world_loc.to_x0z());
 
 						self.map_view.on_player_move(gamestate);
 						self.player_view.on_player_move(gamestate.player.location, promise.void());
@@ -273,20 +271,19 @@ impl View for GfxView {
 		let window_size = self.window.size();
 		let aspect = window_size.x as f32 / window_size.y as f32;
 
-		self.camera.update(aspect);
+		self.gfx.core.set_viewport(window_size);
+		self.gfx.core.set_bg_color(Color::grey(0.1));
+		self.gfx.core.clear();
+		self.gfx.camera.update(aspect);
 
 		let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
-		let near_plane_pos = self.camera.inverse_projection_view() * self.mouse_pos.extend(0.0).extend(1.0);
+		let near_plane_pos = self.gfx.camera.inverse_projection_view() * self.mouse_pos.extend(0.0).extend(1.0);
 		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
 
-		self.gfx.core().set_viewport(window_size);
+		self.gfx.ui.clear();
+		self.gfx.ui.update(self.gfx.camera.forward(), near_plane_pos, aspect);
 
-		self.gfx.core().set_bg_color(Color::grey(0.1));
-		self.gfx.core().clear();
-		self.gfx.ui().clear();
-		self.gfx.ui().update(self.camera.forward(), near_plane_pos, aspect);
-
-		self.gfx.core().set_uniform_mat4("u_proj_view", &self.camera.projection_view());
+		self.gfx.core.set_uniform_mat4("u_proj_view", &self.gfx.camera.projection_view());
 		self.map_view.update(&mut self.gfx, gamestate);
 		self.battle_view.update(&mut self.gfx, gamestate);
 		self.merchant_view.update(&mut self.gfx, gamestate);
@@ -295,7 +292,7 @@ impl View for GfxView {
 
 		self.gfx.draw_world_ui();
 
-		self.gfx.core().set_uniform_mat4("u_proj_view", &ui_proj_view);
+		self.gfx.core.set_uniform_mat4("u_proj_view", &ui_proj_view);
 		self.gfx.draw_screen_ui();
 
 		self.window.swap();

@@ -88,4 +88,47 @@ impl Camera {
 			ctx.run(move |camera| camera.position = end).await;
 		});
 	}
+
+	pub fn zoom_to(&mut self, target: f32) {
+		let start = self.view_size;
+		let end = target;
+
+		self.animation_queue.start(move |ctx| async move {
+			let mut phase = 0.0;
+
+			while phase < 1.0 {
+				phase += 2.0/60.0;
+
+				let size = phase.ease_quad_out(start, end);
+				ctx.run(move |camera| camera.view_size = size).await;
+			}
+
+			ctx.run(move |camera| camera.view_size = end).await;
+		});
+	}
+
+	pub fn rotate_to(&mut self, yaw: f32, pitch: f32) {
+		let start = (self.yaw, self.pitch);
+		let end = (yaw, pitch);
+
+		self.animation_queue.start(move |ctx| async move {
+			let mut phase = 0.0;
+
+			while phase < 1.0 {
+				phase += 2.0/60.0;
+
+				let yaw = phase.ease_quad_out(start.0, end.0);
+				let pitch = phase.ease_quad_out(start.1, end.1);
+				ctx.run(move |camera| {
+					camera.yaw = yaw;
+					camera.pitch = pitch;
+				}).await;
+			}
+
+			ctx.run(move |camera| {
+				camera.yaw = yaw;
+				camera.pitch = pitch;
+			}).await;
+		});
+	}
 }

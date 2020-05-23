@@ -6,15 +6,14 @@ pub mod vertex;
 pub mod mesh_builder;
 pub mod camera;
 
-pub use camera::Camera;
-
 use crate::prelude::*;
 use mesh_builder::MeshBuilder;
 
 pub struct Gfx {
-	core: core::Core,
+	pub core: core::Core,
+	pub camera: camera::Camera,
+	pub ui: ui::Ui,
 
-	ui: ui::Ui,
 	ui_builder: MeshBuilder<ui::UiVertex>,
 }
 
@@ -32,18 +31,11 @@ impl Gfx {
 
 		Gfx {
 			core,
+			camera: camera::Camera::new(),
 
 			ui: ui::Ui::new(),
 			ui_builder,
 		}
-	}
-
-	pub fn core(&mut self) -> &mut core::Core {
-		&mut self.core
-	}
-
-	pub fn ui(&mut self) -> &mut ui::Ui {
-		&mut self.ui
 	}
 
 	pub fn draw_world_ui(&mut self) {

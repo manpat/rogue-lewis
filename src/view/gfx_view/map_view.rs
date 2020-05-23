@@ -11,6 +11,8 @@ pub struct MapView {
 
 	player_move_in_progress: bool,
 	in_main_mode: bool,
+
+	mode_change: Option<ControllerMode>,
 }
 
 impl MapView {
@@ -25,6 +27,8 @@ impl MapView {
 
 			player_move_in_progress: false,
 			in_main_mode: true,
+
+			mode_change: None,
 		}
 	}
 
@@ -33,6 +37,21 @@ impl MapView {
 	}
 
 	pub fn update(&mut self, gfx: &mut Gfx, gamestate: &GameState) {
+		match self.mode_change.take() {
+			Some(ControllerMode::Main) => {
+				gfx.camera.zoom_to(1.2);
+				gfx.camera.rotate_to(PI/8.0, -PI/6.0);
+			}
+
+			Some(ControllerMode::Battle)
+			| Some(ControllerMode::Merchant) => {
+				gfx.camera.zoom_to(0.9);
+				gfx.camera.rotate_to(PI/5.0, -PI/9.0);
+			}
+
+			None => {}
+		}
+
 		build_map(gfx, &gamestate.map);
 
 		if self.player_can_move() {
@@ -48,6 +67,7 @@ impl MapView {
 
 	pub fn on_mode_change(&mut self, mode: ControllerMode) {
 		self.in_main_mode = matches!(mode, ControllerMode::Main);
+		self.mode_change = Some(mode);
 	}
 
 	pub fn on_player_move(&mut self, gamestate: &GameState) {
@@ -77,12 +97,12 @@ fn build_room(gfx: &mut Gfx, pos: Vec2, room: Room, visited: bool) {
 	let visited_room_color = Color::grey(0.4);
 	let color = if visited { visited_room_color } else { room_color };
 
-	gfx.ui().quad(pos.to_x0z(), Vec2::splat(1.0), color, ui::Context::Ground);
+	gfx.ui.quad(pos.to_x0z(), Vec2::splat(1.0), color, ui::Context::Ground);
 
 	for dir in room.iter_neighbor_directions().map(direction_to_offset) {
 		let pos = pos + dir * 0.5;
 		let size = dir + dir.perp() * 0.4;
-		gfx.ui().quad(pos.to_x0z(), size, color, ui::Context::Ground);
+		gfx.ui.quad(pos.to_x0z(), size, color, ui::Context::Ground);
 	}
 }
 
@@ -138,7 +158,7 @@ impl DoorView {
 		let dir = self.dir;
 		let region = ui::Region::new_ground(self.position().to_x0z(), Vec2::splat(0.6));
 
-		gfx.ui().update_interact_region(
+		gfx.ui.update_interact_region(
 			&mut self.hoverable,
 			&region,
 			|| match dir {
@@ -166,7 +186,7 @@ impl DoorView {
 		let shadow_pos = self.position().to_x0z() + Vec3::from_y(0.005);
 		let main_pos = shadow_pos + Vec3::from_y(0.05);
 
-		gfx.ui().arrow(self.dir, shadow_pos, size, shadow_color, ui::Context::Ground);
-		gfx.ui().arrow(self.dir, main_pos, size, color, ui::Context::Ground);
+		gfx.ui.arrow(self.dir, shadow_pos, size, shadow_color, ui::Context::Ground);
+		gfx.ui.arrow(self.dir, main_pos, size, color, ui::Context::Ground);
 	}
 }

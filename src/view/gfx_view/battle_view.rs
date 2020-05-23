@@ -49,35 +49,35 @@ impl BattleView {
 		let heal_button_pos = room_pos + Vec3::new(0.7, 0.01, 0.1);
 
 		// Flee button
-		gfx.ui().update_interact_region(
+		gfx.ui.update_interact_region(
 			&mut self.flee_button,
 			&ui::Region::new_ground(flee_button_pos, size),
 			|| Flee
 		);
 
 		let color = flee_palette.color(self.flee_button.state());
-		gfx.ui().arrow(Direction::East, flee_button_pos, 0.2, color, ui::Context::Ground);
+		gfx.ui.arrow(Direction::East, flee_button_pos, 0.2, color, ui::Context::Ground);
 
 
 		// Attack button
-		gfx.ui().update_interact_region(
+		gfx.ui.update_interact_region(
 			&mut self.attack_button,
 			&ui::Region::new_ground(attack_button_pos, size),
 			|| Attack
 		);
 
 		let color = attack_palette.color(self.attack_button.state());
-		gfx.ui().quad(attack_button_pos, size, color, ui::Context::Ground);
+		gfx.ui.quad(attack_button_pos, size, color, ui::Context::Ground);
 
 
 		// Heal button
-		gfx.ui().update_interact_region(
+		gfx.ui.update_interact_region(
 			&mut self.heal_button,
 			&ui::Region::new_ground(heal_button_pos, size),
 			|| Heal
 		);
 
 		let color = heal_palette.color(self.heal_button.state());
-		gfx.ui().quad(heal_button_pos, size, color, ui::Context::Ground);
+		gfx.ui.quad(heal_button_pos, size, color, ui::Context::Ground);
 	}
 }

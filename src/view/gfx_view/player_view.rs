@@ -20,7 +20,7 @@ pub struct PlayerView {
 impl PlayerView {
 	pub fn new(gfx: &mut gfx::Gfx) -> PlayerView {
 		PlayerView {
-			mb: ColorMeshBuilder::new(gfx.core().new_mesh()),
+			mb: ColorMeshBuilder::new(gfx.core.new_mesh()),
 			pos: Vec3::zero(),
 			animation_queue: AnimationQueue::new(),
 		}
@@ -46,8 +46,8 @@ impl PlayerView {
 
 		self.mb.add_quad(&vs);
 
-		gfx.core().update_mesh_from(&self.mb);
-		gfx.core().draw_mesh(self.mb.mesh_id);
+		gfx.core.update_mesh_from(&self.mb);
+		gfx.core.draw_mesh(self.mb.mesh_id);
 	}
 
 	pub fn on_player_move(&mut self, to: Location, promise: Promise<()>) {

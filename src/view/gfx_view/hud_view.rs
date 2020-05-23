@@ -27,7 +27,7 @@ impl HudView {
 			let pos = Vec3::new(pos_x, pos_y, 0.0);
 			let color = ui::palette().health.base;
 
-			gfx.ui().quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomLeft);
+			gfx.ui.quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomLeft);
 		}
 
 		for i in 0..gamestate.player.hunger {
@@ -37,7 +37,7 @@ impl HudView {
 			let pos = Vec3::new(pos_x, pos_y, 0.0);
 			let color = ui::palette().hunger.base;
 
-			gfx.ui().quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomLeft);
+			gfx.ui.quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomLeft);
 		}
 
 		for i in 0..gamestate.player.inventory.count(Item::Treasure) {
@@ -47,7 +47,7 @@ impl HudView {
 			let pos = Vec3::new(pos_x, pos_y, 0.0);
 			let color = ui::palette().treasure.base;
 
-			gfx.ui().quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomRight);
+			gfx.ui.quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomRight);
 		}
 
 		for i in 0..gamestate.player.inventory.count(Item::Food) {
@@ -57,7 +57,7 @@ impl HudView {
 			let pos = Vec3::new(pos_x, pos_y, 0.0);
 			let color = ui::palette().food.base;
 
-			gfx.ui().quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomRight);
+			gfx.ui.quad(pos, Vec2::new(width, height), color, ui::Context::ScreenBottomRight);
 		}
 
 		// TODO: hide in battle/merchant modes
@@ -67,14 +67,14 @@ impl HudView {
 
 			let region = ui::Region::new(pos, size, ui::Context::ScreenTopLeft);
 
-			gfx.ui().update_interact_region(
+			gfx.ui.update_interact_region(
 				&mut self.map_hoverable,
 				&region,
 				|| crate::controller::main::PlayerCommand::ShowMap
 			);
 
 			let color = ui::palette().map.color(self.map_hoverable.state());
-			gfx.ui().quad(pos, size, color, ui::Context::ScreenTopLeft);
+			gfx.ui.quad(pos, size, color, ui::Context::ScreenTopLeft);
 
 		} else {
 			self.map_hoverable.reset();

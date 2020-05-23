@@ -39,8 +39,8 @@ async fn try_move(dir: Direction) -> bool {
 		task::sate_player().await;
 	}
 
-	let player_pos = get_executor().hack_game_mut().player.location;
-	let current_room = get_executor().hack_game_mut().map.get(player_pos).unwrap();
+	let player_pos = get_executor().hack_game().player.location;
+	let current_room = get_executor().hack_game().map.get(player_pos).unwrap();
 
 	get_executor().hack_game_mut().map.mark_visited(player_pos);
 
@@ -110,7 +110,7 @@ async fn run_encounter(encounter_ty: EncounterType) {
 
 		EncounterType::Boss => {
 			let player_loc = get_executor().hack_game().player.location;
-			if get_executor().hack_game_mut().get_enemy(player_loc).is_none() {
+			if get_executor().hack_game().get_enemy(player_loc).is_none() {
 				get_executor().hack_game_mut().spawn_enemy_at(player_loc, true);
 			}
 

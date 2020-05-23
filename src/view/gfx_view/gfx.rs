@@ -4,6 +4,9 @@ pub mod mesh;
 pub mod shader;
 pub mod vertex;
 pub mod mesh_builder;
+pub mod camera;
+
+pub use camera::Camera;
 
 use crate::prelude::*;
 use mesh_builder::MeshBuilder;

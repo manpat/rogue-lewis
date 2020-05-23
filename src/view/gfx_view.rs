@@ -36,16 +36,10 @@ pub struct GfxView {
 
 	window: window::Window,
 	gfx: Gfx,
+	camera: gfx::Camera,
 
 	should_quit: bool,
 	mouse_pos: Vec2,
-
-	timer: f64,
-	camera_target: Vec3,
-	camera_pos: Vec3,
-
-	camera_proj_view: Mat4,
-	camera_forward: Vec3,
 
 	map_view: MapView,
 	player_view: PlayerView,
@@ -87,16 +81,10 @@ impl GfxView {
 
 			window,
 			gfx,
+			camera: gfx::Camera::new(),
 
 			should_quit: false,
 			mouse_pos: Vec2::zero(),
-
-			timer: 0.0,
-			camera_target: Vec3::zero(),
-			camera_pos: Vec3::zero(),
-
-			camera_proj_view: Mat4::ident(),
-			camera_forward: Vec3::from_y(-1.0),
 
 			map_view,
 			player_view,
@@ -226,7 +214,7 @@ impl GfxView {
 						println!("You move {}", dir);
 						let world_loc = location_to_world(gamestate.player.location);
 
-						self.camera_target = world_loc.to_x0z();
+						self.camera.move_to(world_loc.to_x0z());
 
 						self.map_view.on_player_move(gamestate);
 						self.player_view.on_player_move(gamestate.player.location, promise.void());
@@ -282,25 +270,13 @@ impl View for GfxView {
 			self.run_command(gamestate, cmd, promise);
 		}
 
-		self.timer += 1.0/60.0;
-
-		// TODO: refactor all of this into a Camera type
-		self.camera_pos += (self.camera_target - self.camera_pos) / 60.0;
-
 		let window_size = self.window.size();
 		let aspect = window_size.x as f32 / window_size.y as f32;
 
-		let projection = Mat4::ortho_aspect(1.2, aspect, -100.0, 200.0);
-		let orientation = Quat::new(Vec3::from_y(1.0), PI/8.0 + self.timer.sin() as f32*0.02)
-			* Quat::new(Vec3::from_x(1.0), -PI/6.0);
+		self.camera.update(aspect);
 
-		let translation = Mat4::translate(-self.camera_pos + orientation.forward() * 3.0);
-		self.camera_forward = orientation.forward();
-
-		self.camera_proj_view = projection * orientation.conjugate().to_mat4() * translation;
 		let ui_proj_view = Mat4::ortho_aspect(1.0, aspect, -100.0, 200.0);
-
-		let near_plane_pos = self.camera_proj_view.inverse() * self.mouse_pos.extend(0.0).extend(1.0);
+		let near_plane_pos = self.camera.inverse_projection_view() * self.mouse_pos.extend(0.0).extend(1.0);
 		let near_plane_pos = near_plane_pos.to_vec3() / near_plane_pos.w;
 
 		self.gfx.core().set_viewport(window_size);
@@ -308,9 +284,9 @@ impl View for GfxView {
 		self.gfx.core().set_bg_color(Color::grey(0.1));
 		self.gfx.core().clear();
 		self.gfx.ui().clear();
-		self.gfx.ui().update(self.camera_forward, near_plane_pos, aspect);
+		self.gfx.ui().update(self.camera.forward(), near_plane_pos, aspect);
 
-		self.gfx.core().set_uniform_mat4("u_proj_view", &self.camera_proj_view);
+		self.gfx.core().set_uniform_mat4("u_proj_view", &self.camera.projection_view());
 		self.map_view.update(&mut self.gfx, gamestate);
 		self.battle_view.update(&mut self.gfx, gamestate);
 		self.merchant_view.update(&mut self.gfx, gamestate);

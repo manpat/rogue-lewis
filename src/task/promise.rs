@@ -98,29 +98,21 @@ pub trait Promisable: Sized {
 	fn new_promise(waker: Waker) -> Promise<Self>;
 }
 
-impl Promisable for () {
-	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
-}
-impl Promisable for bool {
-	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
-}
-impl Promisable for String {
-	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
-}
-impl Promisable for PlayerCommand {
-	fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
-}
+
+macro_rules! impl_promise_type {
+	($ty:ty, $id:ident) => {
+		impl Promisable for $ty {
+			fn new_promise(waker: Waker) -> Promise<Self> { Promise::new(waker) }
+		}
 
 
-impl From<Promise<()>> for UntypedPromise {
-	fn from(o: Promise<()>) -> UntypedPromise { UntypedPromise::Void(o) }
+		impl From<Promise<$ty>> for UntypedPromise {
+			fn from(o: Promise<$ty>) -> UntypedPromise { UntypedPromise::$id(o) }
+		}
+	}
 }
-impl From<Promise<bool>> for UntypedPromise {
-	fn from(o: Promise<bool>) -> UntypedPromise { UntypedPromise::Bool(o) }
-}
-impl From<Promise<String>> for UntypedPromise {
-	fn from(o: Promise<String>) -> UntypedPromise { UntypedPromise::String(o) }
-}
-impl From<Promise<PlayerCommand>> for UntypedPromise {
-	fn from(o: Promise<PlayerCommand>) -> UntypedPromise { UntypedPromise::PlayerCommand(o) }
-}
+
+impl_promise_type!((), Void);
+impl_promise_type!(bool, Bool);
+impl_promise_type!(String, String);
+impl_promise_type!(PlayerCommand, PlayerCommand);

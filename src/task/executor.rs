@@ -47,7 +47,7 @@ impl Executor {
 		}
 	}
 
-	pub fn queue<F>(&self, f: F) where F: Future<Output=()> + 'static {
+	pub fn queue<F>(&self, f: F) -> TaskId where F: Future<Output=()> + 'static {
 		let mut task_list = self.task_list.lock().unwrap();
 
 		task_list.task_id += 1;
@@ -59,6 +59,7 @@ impl Executor {
 		});
 
 		self.wake_queue.lock().unwrap().push(task_id);
+		task_id
 	}
 
 	pub fn num_queued_tasks(&self) -> usize {
@@ -129,7 +130,7 @@ impl Executor {
 
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-struct TaskId(usize);
+pub struct TaskId(usize);
 
 const INVALID_TASK_ID: TaskId = TaskId(0);
 

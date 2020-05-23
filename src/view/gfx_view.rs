@@ -2,6 +2,8 @@ mod window;
 mod gfx;
 mod util;
 
+mod animation;
+
 mod map_view;
 mod battle_view;
 mod merchant_view;

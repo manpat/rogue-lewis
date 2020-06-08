@@ -6,7 +6,7 @@ pub mod vertex;
 pub mod mesh_builder;
 pub mod camera;
 
-use crate::prelude::*;
+// use crate::prelude::*;
 use mesh_builder::MeshBuilder;
 
 pub struct Gfx {

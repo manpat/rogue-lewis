@@ -71,7 +71,7 @@ impl Camera {
 	}
 
 
-	pub fn move_to(&mut self, target: Vec3) {
+	pub fn start_move_to(&mut self, target: Vec3) {
 		let start = self.position;
 		let end = target;
 
@@ -89,7 +89,7 @@ impl Camera {
 		});
 	}
 
-	pub fn zoom_to(&mut self, target: f32) {
+	pub fn start_zoom_to(&mut self, target: f32) {
 		let start = self.view_size;
 		let end = target;
 
@@ -107,7 +107,7 @@ impl Camera {
 		});
 	}
 
-	pub fn rotate_to(&mut self, yaw: f32, pitch: f32) {
+	pub fn start_rotate_to(&mut self, yaw: f32, pitch: f32) {
 		let start = (self.yaw, self.pitch);
 		let end = (yaw, pitch);
 

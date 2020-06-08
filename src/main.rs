@@ -38,11 +38,11 @@ fn run_with_view(mut view: impl View) {
 		EXECUTOR = Some(executor);
 	}
 
-	get_executor().queue(controller::run_main_controller());
+	let ctl_task = get_executor().queue(controller::run_main_controller());
 
 	view.init(&gamestate.borrow());
 
-	while get_executor().num_queued_tasks() > 0 && !view.should_quit() {
+	while get_executor().is_task_running(ctl_task) && !view.should_quit() {
 		get_executor().resume_tasks();
 		get_executor().process_commands(&mut gamestate.borrow_mut(), &mut view);
 		view.update(&gamestate.borrow());

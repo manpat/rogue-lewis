@@ -22,10 +22,10 @@ pub fn intersect_plane(plane_point: Vec3, plane_normal: Vec3, line_point: Vec3, 
 }
 
 
-pub fn intersect_ground(line_point: Vec3, line_direction: Vec3) -> Vec3 {
-	let plane_point = Vec3::zero();
-	let plane_normal = Vec3::from_y(1.0);
+// pub fn intersect_ground(line_point: Vec3, line_direction: Vec3) -> Vec3 {
+// 	let plane_point = Vec3::zero();
+// 	let plane_normal = Vec3::from_y(1.0);
 
-	intersect_plane(plane_point, plane_normal, line_point, line_direction)
-		.expect("Camera forward perpendicular to ground plane")
-}
+// 	intersect_plane(plane_point, plane_normal, line_point, line_direction)
+// 		.expect("Camera forward perpendicular to ground plane")
+// }

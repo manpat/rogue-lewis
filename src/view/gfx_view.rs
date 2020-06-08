@@ -11,6 +11,9 @@ mod merchant_view;
 mod player_view;
 mod hud_view;
 
+use std::thread;
+use std::sync::mpsc::{channel, Sender, Receiver};
+
 use crate::prelude::*;
 use crate::gamestate::{GameState, GameCommand, Inventory};
 use crate::task::{PlayerCommand, UntypedPromise, Promise, ControllerMode};
@@ -33,6 +36,8 @@ pub struct GfxView {
 
 	player_commands: Vec<PlayerCommand>,
 	player_command_promise: Option<Promise<PlayerCommand>>,
+
+	debug_command_rx: Receiver<PlayerCommand>,
 
 	window: window::Window,
 	gfx: Gfx,
@@ -71,12 +76,17 @@ impl GfxView {
 		let merchant_view = MerchantView::new();
 		let hud_view = HudView::new();
 
+		let (debug_command_tx, debug_command_rx) = channel();
+		thread::spawn(move || debug_command_thread(debug_command_tx));
+
 		GfxView {
 			commands: Vec::new(),
 			controller_mode_stack: Vec::new(),
 
 			player_commands: Vec::new(),
 			player_command_promise: None,
+
+			debug_command_rx,
 
 			window,
 			gfx,
@@ -121,13 +131,20 @@ impl GfxView {
 					self.gfx.ui.on_mouse_click();
 				}
 
-				WindowEvent::CloseRequested => self.push_player_command(PlayerCommand::Main(Quit)),
+				WindowEvent::CloseRequested => {
+					self.should_quit = true;
+				}
 
 				_ => {}
 			}
 		}
 
 		for cmd in self.gfx.ui.drain_commands() {
+			self.push_player_command(cmd);
+		}
+
+		let debug_commands: Vec<_> = self.debug_command_rx.try_iter().collect();
+		for cmd in debug_commands {
 			self.push_player_command(cmd);
 		}
 	}
@@ -156,7 +173,13 @@ impl GfxView {
 				}
 			}
 
-			ViewCommand::ShowMap { .. /*whole_map*/ } => {
+			ViewCommand::ShowMap { whole_map: true } => {
+				self.map_view.show_map(promise.void());
+				// print_map(gamestate);
+				// promise.void().fulfill(());
+			}
+
+			ViewCommand::ShowMap { whole_map: false } => {
 				print_map(gamestate);
 				promise.void().fulfill(());
 			}
@@ -212,7 +235,7 @@ impl GfxView {
 						println!("You move {}", dir);
 						let world_loc = location_to_world(gamestate.player.location);
 
-						self.gfx.camera.move_to(world_loc.to_x0z());
+						self.gfx.camera.start_move_to(world_loc.to_x0z());
 
 						self.map_view.on_player_move(gamestate);
 						self.player_view.on_player_move(gamestate.player.location, promise.void());
@@ -313,4 +336,40 @@ fn print_map(state: &GameState) {
 fn window_to_screen(window_size: Vec2i, pos: Vec2) -> Vec2 {
 	let window_half = window_size.to_vec2() / 2.0;
 	(pos - window_half) / window_half * Vec2::new(1.0, -1.0)
+}
+
+
+
+fn debug_command_thread(tx: Sender<PlayerCommand>) {
+	use std::io::{Write, BufRead};
+
+	loop {
+		print!("> ");
+
+		std::io::stdout().flush()
+			.expect("Failed to flush");
+
+		let mut command_str = std::io::stdin().lock()
+			.lines().next()
+			.expect("EOF")
+			.expect("Failed to read stdin");
+
+		if command_str.is_empty() {
+			continue;
+		}
+
+		command_str.make_ascii_lowercase();
+
+		if command_str.starts_with("d ") {
+			let parts = command_str[2..]
+				.split_whitespace()
+				.map(str::to_owned)
+				.collect();
+
+			tx.send(PlayerCommand::Debug(parts))
+				.expect("Failed to send debug command");
+		} else {
+			println!("what does '{}' mean??", command_str);
+		}
+	}
 }

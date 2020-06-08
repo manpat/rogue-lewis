@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::task::promise::*;
 use crate::task::executor::TaskId;
-use std::task::{self, RawWaker, RawWakerVTable, Waker, Poll};
+use std::task::Poll;
 use std::future::Future;
 use std::pin::Pin;
 

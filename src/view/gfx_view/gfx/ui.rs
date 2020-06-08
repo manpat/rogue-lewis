@@ -393,7 +393,7 @@ impl HoverablePalette {
 		}
 	}
 
-	pub fn with_hover(mut self, hover: Color) -> HoverablePalette {
+	pub fn with_hover(self, hover: Color) -> HoverablePalette {
 		HoverablePalette { hover, .. self }
 	}
 

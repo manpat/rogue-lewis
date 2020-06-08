@@ -1,5 +1,4 @@
 use super::vertex::Vertex;
-use super::Gfx;
 use super::mesh::MeshID;
 
 pub struct MeshBuilder<V: Vertex> {

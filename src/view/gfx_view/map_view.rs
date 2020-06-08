@@ -2,7 +2,7 @@ use crate::prelude::*;
 use super::util::*;
 use super::gfx::{Gfx, ui};
 
-use crate::task::{PlayerCommand, ControllerMode};
+use crate::task::{PlayerCommand, ControllerMode, Promise};
 use crate::gamestate::GameState;
 use crate::room::Room;
 
@@ -13,6 +13,7 @@ pub struct MapView {
 	in_main_mode: bool,
 
 	mode_change: Option<ControllerMode>,
+	full_map_promise: Option<Promise<()>>,
 }
 
 impl MapView {
@@ -29,6 +30,7 @@ impl MapView {
 			in_main_mode: true,
 
 			mode_change: None,
+			full_map_promise: None,
 		}
 	}
 
@@ -39,14 +41,14 @@ impl MapView {
 	pub fn update(&mut self, gfx: &mut Gfx, gamestate: &GameState) {
 		match self.mode_change.take() {
 			Some(ControllerMode::Main) => {
-				gfx.camera.zoom_to(1.2);
-				gfx.camera.rotate_to(PI/8.0, -PI/6.0);
+				gfx.camera.start_zoom_to(1.2);
+				gfx.camera.start_rotate_to(PI/8.0, -PI/6.0);
 			}
 
 			Some(ControllerMode::Battle)
 			| Some(ControllerMode::Merchant) => {
-				gfx.camera.zoom_to(0.9);
-				gfx.camera.rotate_to(PI/5.0, -PI/9.0);
+				gfx.camera.start_zoom_to(0.9);
+				gfx.camera.start_rotate_to(PI/5.0, -PI/9.0);
 			}
 
 			None => {}
@@ -63,6 +65,7 @@ impl MapView {
 
 	fn player_can_move(&self) -> bool {
 		self.in_main_mode && !self.player_move_in_progress
+			&& self.full_map_promise.is_none()
 	}
 
 	pub fn on_mode_change(&mut self, mode: ControllerMode) {
@@ -81,6 +84,11 @@ impl MapView {
 			view.set_enabled(room.door(view.dir));
 			view.pos = world_pos;
 		}
+	}
+
+	pub fn show_map(&mut self, promise: Promise<()>) {
+		assert!(self.full_map_promise.is_none());
+		self.full_map_promise = Some(promise);
 	}
 
 	// TODO: this whole deal would probably be better off as a future

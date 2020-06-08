@@ -64,6 +64,13 @@ impl Executor {
 		task_id
 	}
 
+	pub fn is_task_running(&self, task_id: TaskId) -> bool {
+		self.task_list.lock().unwrap()
+			.tasks.iter()
+			.find(move |t| t.task_id == task_id)
+			.is_some()
+	}
+
 	pub fn num_queued_tasks(&self) -> usize {
 		self.task_list.lock().unwrap().tasks.len()
 	}

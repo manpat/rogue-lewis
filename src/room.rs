@@ -24,6 +24,13 @@ impl Room {
 		Direction::iter_all()
 			.filter(move |&dir| self.door(dir))
 	}
+
+	pub fn has_interactable(&self) -> bool {
+		self.is_exit || matches!(
+			self.encounter,
+			Some(EncounterType::Merchant) | Some(EncounterType::Chest)
+		)
+	}
 }
 
 

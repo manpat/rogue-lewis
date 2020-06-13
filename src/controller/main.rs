@@ -13,6 +13,7 @@ pub enum PlayerCommand {
 	GoWest,
 
 	Heal,
+	Interact,
 
 	ShowMap,
 	ShowInventory,
@@ -21,16 +22,17 @@ pub enum PlayerCommand {
 
 
 
-async fn try_move(dir: Direction) -> bool {
+async fn try_move(dir: Direction) {
 	if !task::move_player(dir).await {
 		println!("You can't go that way");
-		return false;
+		return;
 	}
 
 	if !task::consume_player_item(Item::Food).await {
 		if !task::starve_player().await {
 			println!("You starve to death");
-			return true
+			return;
+
 		} else {
 			println!("You have run out of food! You can travel {} rooms",
 				get_executor().hack_game_mut().player.hunger);
@@ -47,7 +49,7 @@ async fn try_move(dir: Direction) -> bool {
 	// TODO: leaving should be optional
 	if current_room.is_exit {
 		println!("You found the exit!");
-		return true
+		return;
 	}
 
 	if let Some(encounter_ty) = current_room.encounter {
@@ -59,8 +61,6 @@ async fn try_move(dir: Direction) -> bool {
 	}
 
 	task::show_map(false).await;
-
-	false
 }
 
 async fn run_encounter(encounter_ty: EncounterType) {
@@ -73,29 +73,6 @@ async fn run_encounter(encounter_ty: EncounterType) {
 		EncounterType::Map => task::give_player_item(Item::Map).await,
 
 		EncounterType::Equipment => task::give_player_item(Item::Equipment(random())).await,
-
-		// TODO: Chest should be optionally
-		EncounterType::Chest => {
-			let chest_items = [
-				Item::Food, Item::Treasure, Item::Key,
-				Item::Potion, Item::Equipment(random())
-			];
-
-			if task::consume_player_item(Item::Key).await {
-				let num_items = rng().gen_range(1, 5);
-				let items = chest_items.choose_multiple(&mut rng(), num_items);
-
-				println!("You found a chest!");
-				println!("You open it with one of your keys");
-
-				for item in items {
-					task::give_player_item(*item).await;
-				}
-
-			} else {
-				println!("You found a chest, but don't have a key to open it");
-			}
-		}
 
 		EncounterType::Monster => {
 			let player_loc = get_executor().hack_game().player.location;
@@ -119,14 +96,58 @@ async fn run_encounter(encounter_ty: EncounterType) {
 			task::leave_mode().await;
 		}
 
-		EncounterType::Merchant => {
-			task::enter_mode(task::ControllerMode::Merchant).await;
-			run_merchant_controller().await;
-			task::leave_mode().await;
-		}		
+		EncounterType::Trap => {
+			println!("Do trap");
+		}
 
 		_ => {}
 	}
+}
+
+
+async fn interact() -> bool {
+	use crate::room::EncounterType;
+	
+	let location = get_executor().hack_game().player.location;
+	let room = get_executor().hack_game().map.get(location).unwrap();
+
+	if room.is_exit {
+		return true;
+	}
+
+	match room.encounter {
+		Some(EncounterType::Merchant) => {
+			task::enter_mode(task::ControllerMode::Merchant).await;
+			run_merchant_controller().await;
+			task::leave_mode().await;
+		}
+
+		Some(EncounterType::Chest) => {
+			let chest_items = [
+				Item::Food, Item::Treasure, Item::Key,
+				Item::Potion, Item::Equipment(random())
+			];
+
+			if task::consume_player_item(Item::Key).await {
+				let num_items = rng().gen_range(1, 5);
+				let items = chest_items.choose_multiple(&mut rng(), num_items);
+
+				println!("You found a chest!");
+				println!("You open it with one of your keys");
+
+				for item in items {
+					task::give_player_item(*item).await;
+				}
+
+			} else {
+				println!("You found a chest, but don't have a key to open it");
+			}
+		}
+
+		_ => {}
+	}
+
+	false
 }
 
 
@@ -219,10 +240,10 @@ pub async fn run_main_controller() {
 			}
 
 			match command.main().unwrap() {
-				PlayerCommand::GoNorth => if try_move(Direction::North).await { break 'main_loop }
-				PlayerCommand::GoEast => if try_move(Direction::East).await { break 'main_loop }
-				PlayerCommand::GoSouth => if try_move(Direction::South).await { break 'main_loop }
-				PlayerCommand::GoWest => if try_move(Direction::West).await { break 'main_loop }
+				PlayerCommand::GoNorth => try_move(Direction::North).await,
+				PlayerCommand::GoEast => try_move(Direction::East).await,
+				PlayerCommand::GoSouth => try_move(Direction::South).await,
+				PlayerCommand::GoWest => try_move(Direction::West).await,
 				PlayerCommand::ShowMap => task::show_map(true).await,
 				PlayerCommand::ShowInventory => task::show_inventory().await,
 
@@ -233,6 +254,8 @@ pub async fn run_main_controller() {
 						println!("You don't have enough food!");
 					}
 				}
+
+				PlayerCommand::Interact => if interact().await { break 'main_loop },
 
 				PlayerCommand::Quit => break 'main_loop,
 			}

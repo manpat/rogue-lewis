@@ -97,8 +97,8 @@ impl Ui {
 	}
 
 	pub(super) fn build_world_space(&mut self, mb: &mut MeshBuilder<UiVertex>) {
-		for &DumbQuad {pos, size, color, ..} in 
-			self.dumb_quads.iter().filter(|q| q.context.is_world())
+		for &DumbQuad {region: Region{pos, size, ..}, color} in 
+			self.dumb_quads.iter().filter(|q| q.region.context.is_world())
 		{
 			let size = size / 2.0;
 			let color = color.into();
@@ -111,14 +111,14 @@ impl Ui {
 			]);
 		}
 
-		for &DumbArrow {direction, pos, size, color, ..} in 
-			self.dumb_arrows.iter().filter(|a| a.context.is_world())
+		for &DumbArrow {region: Region{pos, size, ..}, direction, color} in 
+			self.dumb_arrows.iter().filter(|a| a.region.context.is_world())
 		{
 			let color = color.into();
 			let offset = direction_to_offset(direction);
 
-			let major = offset.to_x0z() * (size/2.0);
-			let minor = offset.perp().to_x0z() * (size/2.0);
+			let major = offset.to_x0z() * (size.y/2.0);
+			let minor = offset.perp().to_x0z() * (size.x/2.0);
 
 			// Draw arrow shadow
 			mb.add_tri_fan(&[
@@ -135,8 +135,8 @@ impl Ui {
 
 		let aspect = aspect_to_vec(self.aspect).extend(1.0);
 
-		for &DumbQuad {pos, size, color, context} in 
-			self.dumb_quads.iter().filter(|q| q.context.is_screen())
+		for &DumbQuad {region: Region{context, pos, size}, color} in 
+			self.dumb_quads.iter().filter(|q| q.region.context.is_screen())
 		{
 			let size = size / 2.0;
 			let color = color.into();
@@ -183,29 +183,53 @@ impl Ui {
 	}
 
 
-	pub fn quad(&mut self, pos: Vec3, size: Vec2, color: Color, context: Context) {
-		self.dumb_quads.push(DumbQuad { context, pos, size, color });
+	pub fn update_immediate_interact_region(&mut self, hoverable: &mut Hoverable, region: &Region) -> bool {
+		hoverable.update();
+
+		if region.includes(self) {
+			hoverable.begin_hover();
+
+			if self.click_occured {
+				hoverable.click();
+				// Don't click more than one thing
+				self.click_occured = false;
+
+				return true;
+			}
+
+		} else {
+			hoverable.end_hover();
+		}
+
+		false
 	}
 
-	pub fn arrow(&mut self, direction: Direction, pos: Vec3, size: f32, color: Color, context: Context) {
-		self.dumb_arrows.push(DumbArrow { context, direction, pos, size, color });
+
+	pub fn quad<R>(&mut self, region: R, color: Color)
+		where R: Into<Region>
+	{
+		let region = region.into();
+		self.dumb_quads.push(DumbQuad { region, color });
+	}
+
+	pub fn arrow<R>(&mut self, region: R, direction: Direction, color: Color)
+		where R: Into<Region>
+	{
+		let region = region.into();
+		self.dumb_arrows.push(DumbArrow { region, direction, color });
 	}
 }
 
 
 
 struct DumbQuad {
-	context: Context,
-	pos: Vec3,
-	size: Vec2,
+	region: Region,
 	color: Color,
 }
 
 struct DumbArrow {
-	context: Context,
+	region: Region,
 	direction: Direction,
-	pos: Vec3,
-	size: f32,
 	color: Color,
 }
 
@@ -285,6 +309,14 @@ impl Region {
 		diff.x.abs() < extent.x && diff.y.abs() < extent.y
 	}
 }
+
+
+impl From<(Vec3, Vec2, Context)> for Region {
+	fn from((pos, size, context): (Vec3, Vec2, Context)) -> Region {
+		Region::new(pos, size, context)
+	}
+}
+
 
 
 
@@ -428,6 +460,7 @@ pub struct GlobalPalette {
 	pub hunger: HoverablePalette,
 	pub map: HoverablePalette,
 	pub treasure: HoverablePalette,
+	pub movement: HoverablePalette,
 }
 
 static mut GLOBAL_PALETTE: Option<GlobalPalette> = None;
@@ -441,6 +474,8 @@ pub fn palette() -> &'static GlobalPalette {
 				map: HoverablePalette::new(Color::rgb(0.5, 0.0, 1.0)),
 				food: HoverablePalette::new(Color::rgb(0.6, 0.5, 0.2)),
 				treasure: HoverablePalette::new(Color::rgb(0.3, 0.6, 0.2)),
+				movement: HoverablePalette::new(Color::rgba(1.0, 0.4, 0.5, 0.2))
+					.with_hover(Color::rgb(1.0, 0.4, 0.5)),
 			}
 		})
 	}

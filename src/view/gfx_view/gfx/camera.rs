@@ -22,15 +22,20 @@ pub struct Camera {
 }
 
 
+const DEFAULT_VIEW_SIZE: f32 = 1.2;
+const DEFAULT_YAW: f32 = PI/8.0;
+const DEFAULT_PITCH: f32 = -PI/6.0;
+
+
 impl Camera {
 	pub fn new() -> Self {
 		Self {
-			view_size: 1.2,
+			view_size: DEFAULT_VIEW_SIZE,
 			view_dist: 3.0,
 
 			position: Vec3::zero(),
-			yaw: PI/8.0,
-			pitch: -PI/6.0,
+			yaw: DEFAULT_YAW,
+			pitch: DEFAULT_PITCH,
 
 			projection_view: Mat4::ident(),
 			inv_projection_view: Mat4::ident(),
@@ -70,6 +75,11 @@ impl Camera {
 		self.inv_projection_view
 	}
 
+
+	pub fn start_zoom_rotate_to_default(&mut self) {
+		self.start_rotate_to(DEFAULT_YAW, DEFAULT_PITCH);
+		self.start_zoom_to(DEFAULT_VIEW_SIZE);
+	}
 
 	pub fn start_move_to(&mut self, target: Vec3) {
 		let start = self.position;

@@ -241,6 +241,7 @@ fn parse_main_player_command(cmd: &str) -> Option<PlayerCommand> {
 		"i" | "inv" | "inventory" => ShowInventory,
 
 		"heal" | "eat" => Heal,
+		"use" | "interact" => Interact,
 
 		// "r" | "restart" => Some(Event::Restart),
 		"q" | "quit" => Quit,
